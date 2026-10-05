@@ -427,6 +427,7 @@ impl ChatWidget {
         crate::startup_recovery::bind_submission(&text, &client_user_message_id);
         let pending_steer = (!render_in_history).then(|| PendingSteer {
             client_id: client_user_message_id.clone(),
+            accepted_turn_id: None,
             user_message: UserMessage {
                 text: text.clone(),
                 local_images: local_images.clone(),

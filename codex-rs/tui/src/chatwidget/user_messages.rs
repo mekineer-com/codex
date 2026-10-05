@@ -201,6 +201,8 @@ impl From<&str> for UserMessage {
 pub(crate) struct PendingSteer {
     /// Preserved across request retries and thread switches until this submission commits.
     pub(crate) client_id: String,
+    /// Server acknowledgement, not the possibly newer visible turn.
+    pub(super) accepted_turn_id: Option<String>,
     pub(super) user_message: UserMessage,
     pub(super) history_record: UserMessageHistoryRecord,
     pub(super) source: UserMessageSource,

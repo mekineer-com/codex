@@ -1063,6 +1063,11 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::TurnInterruptResponse,
     },
+    TurnSteerWithdraw => "turn/steer/withdraw" {
+        params: v2::TurnSteerWithdrawParams,
+        serialization: thread_id(params.thread_id),
+        response: v2::TurnSteerWithdrawResponse,
+    },
     #[experimental("thread/realtime/start")]
     ThreadRealtimeStart => "thread/realtime/start" {
         params: v2::ThreadRealtimeStartParams,

@@ -22,6 +22,10 @@ use tokio_util::task::AbortOnDropHandle;
 /// Host capture metadata belonging to one input, including steers within another turn.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserInputMetadata {
+    /// Only live, context-free steering submissions can be withdrawn.
+    /// Deserialized input stays ineligible; withdrawal never rewrites history.
+    #[serde(skip)]
+    pub withdrawal_allowed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acceptance_order: Option<u64>,
     #[serde(
@@ -88,7 +92,7 @@ pub(crate) enum InputQueueActivity {
 /// Turn-local pending input storage owned by the input queue flow.
 #[derive(Default)]
 pub(crate) struct TurnInputQueue {
-    items: Vec<TurnInput>,
+    pub(super) items: Vec<TurnInput>,
 }
 
 /// Session-scoped pending input storage and active-turn mailbox delivery coordination.

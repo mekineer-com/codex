@@ -97,6 +97,11 @@ impl Serialize for RealtimeSpeechText {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) enum AppCommand {
     Interrupt,
+    WithdrawSteer {
+        thread_id: ThreadId,
+        turn_id: String,
+        client_id: String,
+    },
     CleanBackgroundTerminals,
     RealtimeConversationStart {
         thread_id: ThreadId,

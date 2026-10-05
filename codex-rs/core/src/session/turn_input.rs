@@ -755,6 +755,14 @@ impl Session {
         {
             return Err(NotSubmittedReason::ActiveTurnOutputSchemaMismatch);
         }
+        let withdrawal_allowed = matches!(
+            input,
+            SubmittedTurnInput::UserInput {
+                client_id: Some(_),
+                ..
+            }
+        ) && additional_context.is_empty()
+            && responsesapi_client_metadata.is_none();
         let mut pending_input = merge_additional_context_input(self, additional_context).await;
 
         if let Some(responsesapi_client_metadata) = responsesapi_client_metadata {
@@ -776,6 +784,7 @@ impl Session {
                     metadata: super::UserInputMetadata {
                         acceptance_order: Some(self.reserve_user_input_order().await),
                         origin,
+                        withdrawal_allowed,
                     },
                 }
             }
@@ -820,6 +829,7 @@ async fn pending_turn_input(
             metadata: super::UserInputMetadata {
                 acceptance_order: Some(session.reserve_user_input_order().await),
                 origin,
+                ..Default::default()
             },
         },
         SubmittedTurnInput::ResponseItem(mut item)

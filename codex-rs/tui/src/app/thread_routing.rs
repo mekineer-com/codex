@@ -663,6 +663,35 @@ impl App {
         op: &AppCommand,
     ) -> Result<bool> {
         match op {
+            AppCommand::WithdrawSteer {
+                thread_id: origin_thread,
+                turn_id,
+                client_id,
+            } => {
+                // App events can be handled after navigation or additional draft input.
+                if *origin_thread != thread_id
+                    || self.chat_widget.thread_id() != Some(*origin_thread)
+                    || !self.chat_widget.composer_is_empty_for_recall()
+                {
+                    return Ok(true);
+                }
+                let response = app_server
+                    .turn_steer_withdraw(*origin_thread, turn_id.clone(), client_id.clone())
+                    .await?;
+                match response.status {
+                    codex_app_server_protocol::TurnSteerWithdrawStatus::Withdrawn => {
+                        self.chat_widget.on_pending_steer_withdrawn(client_id);
+                    }
+                    codex_app_server_protocol::TurnSteerWithdrawStatus::NotPending
+                    | codex_app_server_protocol::TurnSteerWithdrawStatus::TurnChanged
+                    | codex_app_server_protocol::TurnSteerWithdrawStatus::NotWithdrawable => {
+                        self.chat_widget.add_warning_message(
+                            "This message could not be withdrawn; it was not recalled.".to_string(),
+                        );
+                    }
+                }
+                Ok(true)
+            }
             AppCommand::Interrupt => {
                 let mut turn_id = self
                     .active_turn_id_for_thread(thread_id)
@@ -761,10 +790,14 @@ impl App {
                             )
                             .await
                         {
-                            Ok(_) => {
+                            Ok(response) => {
                                 if self.active_thread_id == Some(thread_id)
                                     && self.chat_widget.thread_id() == Some(thread_id)
                                 {
+                                    self.chat_widget.acknowledge_pending_steer(
+                                        client_user_message_id,
+                                        response.turn_id,
+                                    );
                                     crate::startup_recovery::acknowledged(client_user_message_id);
                                 }
                                 return Ok(true);

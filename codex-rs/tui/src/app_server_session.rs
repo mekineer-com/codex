@@ -131,6 +131,8 @@ use codex_app_server_protocol::TurnStartParams;
 use codex_app_server_protocol::TurnStartResponse;
 use codex_app_server_protocol::TurnSteerParams;
 use codex_app_server_protocol::TurnSteerResponse;
+use codex_app_server_protocol::TurnSteerWithdrawParams;
+use codex_app_server_protocol::TurnSteerWithdrawResponse;
 use codex_app_server_protocol::UserInput;
 use codex_config::ConfigLayerSource;
 use codex_otel::TelemetryAuthMode;
@@ -1506,6 +1508,25 @@ impl AppServerSession {
                     responsesapi_client_metadata: None,
                     additional_context: None,
                     expected_turn_id: turn_id,
+                },
+            })
+            .await
+    }
+
+    pub(crate) async fn turn_steer_withdraw(
+        &mut self,
+        thread_id: ThreadId,
+        turn_id: String,
+        client_id: String,
+    ) -> std::result::Result<TurnSteerWithdrawResponse, TypedRequestError> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::TurnSteerWithdraw {
+                request_id,
+                params: TurnSteerWithdrawParams {
+                    thread_id: thread_id.to_string(),
+                    expected_turn_id: turn_id,
+                    client_user_message_id: client_id,
                 },
             })
             .await

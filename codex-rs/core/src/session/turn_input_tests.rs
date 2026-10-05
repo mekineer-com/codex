@@ -109,6 +109,114 @@ async fn submit_steer_only(
 }
 
 #[tokio::test]
+async fn withdrawal_removes_only_pending_input_without_cancelling_the_task() {
+    use super::super::InputWithdrawal;
+
+    let (session, context) = make_session_and_context().await;
+    let session = Arc::new(session);
+    let context = Arc::new(context);
+    session
+        .spawn_task(
+            Arc::clone(&context),
+            Vec::new(),
+            NeverEndingTask {
+                kind: TaskKind::Regular,
+                listen_to_cancellation_token: true,
+            },
+        )
+        .await;
+    let content = vec![
+        UserInput::Text {
+            text: "revise the fictional diagram".to_string(),
+            text_elements: Vec::new(),
+        },
+        UserInput::LocalImage {
+            path: "fictional-diagram.png".into(),
+            detail: None,
+        },
+    ];
+    for id in ["recall", "keep"] {
+        let submission = handle(
+            &session,
+            TurnInputRequest::new(SubmittedTurnInput::UserInput {
+                content: content.clone(),
+                client_id: Some(id.to_string()),
+            }),
+            TurnInputMode::Steer {
+                expected_turn_id: context.sub_id.clone(),
+            },
+            id.to_string(),
+        )
+        .await
+        .expect("steer submission");
+        assert_eq!(
+            submission,
+            TurnInputSubmission::Steered {
+                turn_id: context.sub_id.clone()
+            }
+        );
+    }
+    assert_eq!(
+        session
+            .withdraw_pending_input("another-turn", "recall")
+            .await,
+        InputWithdrawal::TurnChanged
+    );
+    assert_eq!(
+        session
+            .withdraw_pending_input(&context.sub_id, "recall")
+            .await,
+        InputWithdrawal::Withdrawn
+    );
+    assert_eq!(
+        session
+            .withdraw_pending_input(&context.sub_id, "recall")
+            .await,
+        InputWithdrawal::NotPending
+    );
+    let pending = session
+        .input_queue
+        .get_pending_input(&session.active_turn)
+        .await
+        .0;
+    assert_eq!(
+        pending,
+        vec![TurnInput::UserInput {
+            content,
+            client_id: Some("keep".to_string()),
+            metadata: super::super::UserInputMetadata {
+                acceptance_order: Some(1),
+                withdrawal_allowed: true,
+                ..Default::default()
+            },
+        }]
+    );
+    assert_eq!(
+        session
+            .withdraw_pending_input(&context.sub_id, "keep")
+            .await,
+        InputWithdrawal::NotPending
+    );
+    {
+        let active = session.active_turn.lock().await;
+        let task = active
+            .as_ref()
+            .expect("active turn")
+            .task
+            .as_ref()
+            .expect("running task");
+        assert!(!task.cancellation_token.is_cancelled());
+    }
+    session.abort_all_tasks(TurnAbortReason::Interrupted).await;
+    assert_eq!(
+        session
+            .withdraw_pending_input(&context.sub_id, "keep")
+            .await,
+        InputWithdrawal::TurnChanged
+    );
+}
+
+#[tokio::test]
 #[expect(
     clippy::await_holding_invalid_type,
     reason = "simulate an in-flight realtime append while checking input admission"
@@ -1067,6 +1175,7 @@ async fn steer_preserves_request_origin(
             metadata: crate::session::UserInputMetadata {
                 acceptance_order: Some(0),
                 origin,
+                ..Default::default()
             },
         }]
     );

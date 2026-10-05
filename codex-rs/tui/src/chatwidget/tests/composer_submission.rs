@@ -1950,6 +1950,69 @@ async fn default_shortcuts_edit_most_recent_queued_message() {
 }
 
 #[tokio::test]
+async fn pending_steer_recall_requires_acknowledgement_and_confirmation() {
+    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    while op_rx.try_recv().is_ok() {}
+    let thread_id = ThreadId::new();
+    chat.thread_id = Some(thread_id);
+    chat.bottom_pane.set_task_running(/*running*/ true);
+    let mut pending = pending_steer("revise the fictional diagram");
+    pending.user_message.remote_image_urls =
+        vec!["https://example.invalid/diagram.png".to_string()];
+    chat.input_queue.pending_steers.push_back(pending.clone());
+
+    chat.request_pending_steer_recall();
+    assert!(op_rx.try_recv().is_err());
+    assert_eq!(
+        chat.input_queue.pending_steers,
+        VecDeque::from([pending.clone()])
+    );
+
+    chat.acknowledge_pending_steer(&pending.client_id, "acknowledged-turn".to_string());
+    pending.accepted_turn_id = Some("acknowledged-turn".to_string());
+    chat.bottom_pane.set_composer_text("new draft".to_string());
+    chat.request_pending_steer_recall();
+    assert!(op_rx.try_recv().is_err());
+    assert_eq!(chat.bottom_pane.composer_text(), "new draft");
+
+    chat.bottom_pane.set_composer_text(String::new());
+    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+    assert_eq!(
+        op_rx.try_recv().expect("withdrawal request"),
+        Op::WithdrawSteer {
+            thread_id,
+            turn_id: "acknowledged-turn".to_string(),
+            client_id: pending.client_id.clone(),
+        }
+    );
+    // An absent/lost confirmation must not restore or resubmit the payload.
+    assert!(chat.bottom_pane.composer_text().is_empty());
+    assert_eq!(
+        chat.input_queue.pending_steers,
+        VecDeque::from([pending.clone()])
+    );
+
+    chat.on_pending_steer_withdrawn(&pending.client_id);
+    assert!(chat.input_queue.pending_steers.is_empty());
+    let restored = chat.bottom_pane.composer_draft_snapshot();
+    assert_eq!(restored.text, pending.user_message.text);
+    assert_eq!(
+        restored.remote_image_urls,
+        pending.user_message.remote_image_urls
+    );
+    assert!(chat.bottom_pane.is_task_running());
+    assert!(op_rx.try_recv().is_err());
+
+    pending.source = UserMessageSource::QuestionAnswer;
+    chat.input_queue.pending_steers.push_back(pending.clone());
+    chat.bottom_pane.set_composer_text(String::new());
+    chat.set_remote_image_urls(Vec::new());
+    chat.request_pending_steer_recall();
+    assert!(op_rx.try_recv().is_err());
+    assert_eq!(chat.input_queue.pending_steers, VecDeque::from([pending]));
+}
+
+#[tokio::test]
 async fn unbound_queued_message_edit_does_not_fall_back_to_alt_up() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     let mut config = codex_config::types::TuiKeymap::default();

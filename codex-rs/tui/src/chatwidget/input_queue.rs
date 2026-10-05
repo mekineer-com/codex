@@ -139,6 +139,7 @@ mod tests {
             .push_back(UserMessage::from("rejected"));
         state.pending_steers.push_back(PendingSteer {
             client_id: "test-submission".to_string(),
+            accepted_turn_id: None,
             user_message: UserMessage::from("pending"),
             history_record: UserMessageHistoryRecord::UserMessageText,
             source: UserMessageSource::Prompt,

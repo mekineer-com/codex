@@ -286,6 +286,7 @@ mod image_submission;
 mod input_flow;
 mod input_restore;
 mod input_submission;
+mod input_withdrawal;
 mod interrupts;
 mod questions;
 mod startup_submission;

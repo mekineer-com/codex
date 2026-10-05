@@ -321,6 +321,34 @@ pub struct TurnSteerResponse {
     pub turn_id: String,
 }
 
+/// Withdraws only a context-free user message still pending in the named turn.
+/// Acceptance telemetry and settings already applied at submission remain unchanged.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct TurnSteerWithdrawParams {
+    pub thread_id: String,
+    pub expected_turn_id: String,
+    pub client_user_message_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase", export_to = "v2/")]
+pub enum TurnSteerWithdrawStatus {
+    Withdrawn,
+    NotPending,
+    TurnChanged,
+    NotWithdrawable,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct TurnSteerWithdrawResponse {
+    pub status: TurnSteerWithdrawStatus,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]
