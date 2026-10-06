@@ -23,6 +23,9 @@ use codex_app_server_protocol::TurnStartParams;
 use codex_app_server_protocol::TurnStartResponse;
 use codex_app_server_protocol::TurnSteerParams;
 use codex_app_server_protocol::TurnSteerResponse;
+use codex_app_server_protocol::TurnSteerWithdrawParams;
+use codex_app_server_protocol::TurnSteerWithdrawResponse;
+use codex_app_server_protocol::TurnSteerWithdrawStatus;
 use codex_app_server_protocol::UserInput as V2UserInput;
 use codex_protocol::user_input::MAX_USER_INPUT_TEXT_CHARS;
 use core_test_support::skip_if_remote;
@@ -35,6 +38,143 @@ use super::analytics::mount_analytics_capture;
 use super::analytics::wait_for_analytics_event;
 
 const DEFAULT_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+#[tokio::test]
+async fn pending_steer_withdrawal_keeps_tool_running_and_resubmits_once() -> Result<()> {
+    skip_if_remote!(Ok(()), "uses a host-local command and file barrier");
+    let tmp = TempDir::new()?;
+    let codex_home = tmp.path().join("codex_home");
+    let workdir = tmp.path().join("workdir");
+    std::fs::create_dir(&codex_home)?;
+    std::fs::create_dir(&workdir)?;
+    let server = create_mock_responses_server_sequence(vec![
+        create_command_execution_sse_response(
+            vec![
+                "sh".to_string(),
+                "-c".to_string(),
+                "touch started; for i in $(seq 1 200); do if test -f release; then touch finished; exit 0; fi; sleep 0.05; done; exit 1".to_string(),
+            ],
+            Some(&workdir),
+            Some(10_000),
+            "call_held_tool",
+        )?,
+        app_test_support::create_final_assistant_message_sse_response("Done")?,
+    ])
+    .await;
+    write_mock_responses_config_toml_with_chatgpt_base_url(
+        &codex_home,
+        &server.uri(),
+        &server.uri(),
+    )?;
+    mount_analytics_capture(&server, &codex_home).await?;
+    let mut mcp = TestAppServer::builder()
+        .with_codex_home(&codex_home)
+        .without_managed_config()
+        .build_initialized()
+        .await?;
+    let ThreadStartResponse { thread, .. } = mcp
+        .start_thread(ThreadStartParams {
+            model: Some("mock-model".to_string()),
+            ..Default::default()
+        })
+        .await?;
+    let TurnStartResponse { turn } = mcp
+        .request(|request_id| ClientRequest::TurnStart {
+            request_id,
+            params: TurnStartParams {
+                thread_id: thread.id.clone(),
+                input: vec![V2UserInput::Text {
+                    text: "run the held tool".to_string(),
+                    text_elements: Vec::new(),
+                }],
+                cwd: Some(workdir.clone()),
+                sandbox_policy: Some(codex_app_server_protocol::SandboxPolicy::DangerFullAccess),
+                ..Default::default()
+            },
+        })
+        .await?;
+    timeout(DEFAULT_READ_TIMEOUT, async {
+        while !workdir.join("started").exists() {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    })
+    .await?;
+    let original = "withdraw-this-fictional-prompt";
+    let edited = "deliver-this-edited-fictional-prompt";
+    let _: TurnSteerResponse = mcp
+        .request(|request_id| ClientRequest::TurnSteer {
+            request_id,
+            params: TurnSteerParams {
+                thread_id: thread.id.clone(),
+                expected_turn_id: turn.id.clone(),
+                client_user_message_id: Some("withdraw-original".to_string()),
+                input: vec![V2UserInput::Text {
+                    text: original.to_string(),
+                    text_elements: Vec::new(),
+                }],
+                additional_context: None,
+                responsesapi_client_metadata: None,
+            },
+        })
+        .await?;
+    for expected in [
+        TurnSteerWithdrawStatus::Withdrawn,
+        TurnSteerWithdrawStatus::NotPending,
+    ] {
+        let reply: TurnSteerWithdrawResponse = mcp
+            .request(|request_id| ClientRequest::TurnSteerWithdraw {
+                request_id,
+                params: TurnSteerWithdrawParams {
+                    thread_id: thread.id.clone(),
+                    expected_turn_id: turn.id.clone(),
+                    client_user_message_id: "withdraw-original".to_string(),
+                },
+            })
+            .await?;
+        assert_eq!(reply.status, expected);
+    }
+    assert!(!workdir.join("finished").exists());
+    let _: TurnSteerResponse = mcp
+        .request(|request_id| ClientRequest::TurnSteer {
+            request_id,
+            params: TurnSteerParams {
+                thread_id: thread.id.clone(),
+                expected_turn_id: turn.id.clone(),
+                client_user_message_id: Some("edited-original".to_string()),
+                input: vec![V2UserInput::Text {
+                    text: edited.to_string(),
+                    text_elements: Vec::new(),
+                }],
+                additional_context: None,
+                responsesapi_client_metadata: None,
+            },
+        })
+        .await?;
+    std::fs::write(workdir.join("release"), b"")?;
+    let completed = timeout(
+        DEFAULT_READ_TIMEOUT,
+        mcp.read_stream_until_notification_message("turn/completed"),
+    )
+    .await??;
+    assert_eq!(
+        completed.params.context("turn/completed params")?["turn"]["status"],
+        "completed"
+    );
+    assert!(workdir.join("finished").exists());
+    let requests = server
+        .get_received_requests()
+        .await
+        .expect("recorded requests");
+    let model_requests: Vec<_> = requests
+        .iter()
+        .filter(|request| request.url.path().ends_with("/responses"))
+        .collect();
+    assert_eq!(model_requests.len(), 2);
+    let follow_up = model_requests[1].body_json::<Value>()?.to_string();
+    assert!(!follow_up.contains(original));
+    assert_eq!(follow_up.matches(edited).count(), 1);
+    Ok(())
+}
 
 #[tokio::test]
 async fn turn_steer_requires_active_turn() -> Result<()> {
