@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Withdraws only a context-free user message still pending in the named turn. Acceptance telemetry and settings already applied at submission remain unchanged.",
+  "properties": {
+    "clientUserMessageId": {
+      "type": "string"
+    },
+    "expectedTurnId": {
+      "type": "string"
+    },
+    "threadId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "clientUserMessageId",
+    "expectedTurnId",
+    "threadId"
+  ],
+  "title": "TurnSteerWithdrawParams",
+  "type": "object"
+}

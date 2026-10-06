@@ -3345,6 +3345,30 @@
             },
             "method": {
               "enum": [
+                "turn/steer/withdraw"
+              ],
+              "title": "Turn/steer/withdrawRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/TurnSteerWithdrawParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "Turn/steer/withdrawRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
                 "review/start"
               ],
               "title": "Review/startRequestMethod",
@@ -23716,6 +23740,50 @@
       ],
       "title": "TurnSteerResponse",
       "type": "object"
+    },
+    "TurnSteerWithdrawParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "description": "Withdraws only a context-free user message still pending in the named turn. Acceptance telemetry and settings already applied at submission remain unchanged.",
+      "properties": {
+        "clientUserMessageId": {
+          "type": "string"
+        },
+        "expectedTurnId": {
+          "type": "string"
+        },
+        "threadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "clientUserMessageId",
+        "expectedTurnId",
+        "threadId"
+      ],
+      "title": "TurnSteerWithdrawParams",
+      "type": "object"
+    },
+    "TurnSteerWithdrawResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/TurnSteerWithdrawStatus"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "TurnSteerWithdrawResponse",
+      "type": "object"
+    },
+    "TurnSteerWithdrawStatus": {
+      "enum": [
+        "withdrawn",
+        "notPending",
+        "turnChanged",
+        "notWithdrawable"
+      ],
+      "type": "string"
     },
     "TurnToolOutput": {
       "properties": {

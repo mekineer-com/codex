@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "TurnSteerWithdrawStatus": {
+      "enum": [
+        "withdrawn",
+        "notPending",
+        "turnChanged",
+        "notWithdrawable"
+      ],
+      "type": "string"
+    }
+  },
+  "properties": {
+    "status": {
+      "$ref": "#/definitions/TurnSteerWithdrawStatus"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "TurnSteerWithdrawResponse",
+  "type": "object"
+}

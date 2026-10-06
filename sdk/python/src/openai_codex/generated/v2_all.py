@@ -6415,6 +6415,22 @@ class TurnSteerResponse(BaseModel):
     turn_id: Annotated[str, Field(alias="turnId")]
 
 
+class TurnSteerWithdrawParams(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    client_user_message_id: Annotated[str, Field(alias="clientUserMessageId")]
+    expected_turn_id: Annotated[str, Field(alias="expectedTurnId")]
+    thread_id: Annotated[str, Field(alias="threadId")]
+
+
+class TurnSteerWithdrawStatus(Enum):
+    withdrawn = "withdrawn"
+    not_pending = "notPending"
+    turn_changed = "turnChanged"
+    not_withdrawable = "notWithdrawable"
+
+
 class TextUserInput(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -7397,6 +7413,17 @@ class TurnInterruptRequest(BaseModel):
     id: RequestId
     method: Annotated[Literal["turn/interrupt"], Field(title="Turn/interruptRequestMethod")]
     params: TurnInterruptParams
+
+
+class TurnSteerWithdrawRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    id: RequestId
+    method: Annotated[
+        Literal["turn/steer/withdraw"], Field(title="Turn/steer/withdrawRequestMethod")
+    ]
+    params: TurnSteerWithdrawParams
 
 
 class ModelListRequest(BaseModel):
@@ -10483,6 +10510,13 @@ class TurnSteerParams(BaseModel):
     thread_id: Annotated[str, Field(alias="threadId")]
 
 
+class TurnSteerWithdrawResponse(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    status: TurnSteerWithdrawStatus
+
+
 class WindowsSandboxSetupCompletedNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -12657,6 +12691,7 @@ class ClientRequest(
         | TurnStartRequest
         | TurnSteerRequest
         | TurnInterruptRequest
+        | TurnSteerWithdrawRequest
         | ReviewStartRequest
         | ModelListRequest
         | AccountGatewayOAuthReadRequest
@@ -12768,6 +12803,7 @@ class ClientRequest(
         | TurnStartRequest
         | TurnSteerRequest
         | TurnInterruptRequest
+        | TurnSteerWithdrawRequest
         | ReviewStartRequest
         | ModelListRequest
         | AccountGatewayOAuthReadRequest
