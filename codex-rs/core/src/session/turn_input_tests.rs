@@ -174,6 +174,23 @@ async fn withdrawal_removes_only_pending_input_without_cancelling_the_task() {
             .await,
         InputWithdrawal::NotPending
     );
+    let edited_content = vec![UserInput::Text {
+        text: "revise only the fictional diagram title".to_string(),
+        text_elements: Vec::new(),
+    }];
+    handle(
+        &session,
+        TurnInputRequest::new(SubmittedTurnInput::UserInput {
+            content: edited_content.clone(),
+            client_id: Some("edited-recall".to_string()),
+        }),
+        TurnInputMode::Steer {
+            expected_turn_id: context.sub_id.clone(),
+        },
+        "edited-recall".to_string(),
+    )
+    .await
+    .expect("edited prompt resubmission");
     let pending = session
         .input_queue
         .get_pending_input(&session.active_turn)
@@ -181,15 +198,26 @@ async fn withdrawal_removes_only_pending_input_without_cancelling_the_task() {
         .0;
     assert_eq!(
         pending,
-        vec![TurnInput::UserInput {
-            content,
-            client_id: Some("keep".to_string()),
-            metadata: super::super::UserInputMetadata {
-                acceptance_order: Some(1),
-                withdrawal_allowed: true,
-                ..Default::default()
+        vec![
+            TurnInput::UserInput {
+                content,
+                client_id: Some("keep".to_string()),
+                metadata: super::super::UserInputMetadata {
+                    acceptance_order: Some(1),
+                    withdrawal_allowed: true,
+                    ..Default::default()
+                },
             },
-        }]
+            TurnInput::UserInput {
+                content: edited_content,
+                client_id: Some("edited-recall".to_string()),
+                metadata: super::super::UserInputMetadata {
+                    acceptance_order: Some(2),
+                    withdrawal_allowed: true,
+                    ..Default::default()
+                },
+            },
+        ]
     );
     assert_eq!(
         session
