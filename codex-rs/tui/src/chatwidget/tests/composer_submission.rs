@@ -1970,12 +1970,14 @@ async fn pending_steer_recall_requires_acknowledgement_and_confirmation() {
 
     chat.acknowledge_pending_steer(&pending.client_id, "acknowledged-turn".to_string());
     pending.accepted_turn_id = Some("acknowledged-turn".to_string());
-    chat.bottom_pane.set_composer_text("new draft".to_string());
+    chat.bottom_pane
+        .set_composer_text("new draft".to_string(), Vec::new(), Vec::new());
     chat.request_pending_steer_recall();
     assert!(op_rx.try_recv().is_err());
     assert_eq!(chat.bottom_pane.composer_text(), "new draft");
 
-    chat.bottom_pane.set_composer_text(String::new());
+    chat.bottom_pane
+        .set_composer_text(String::new(), Vec::new(), Vec::new());
     chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
     assert_eq!(
         op_rx.try_recv().expect("withdrawal request"),
@@ -2005,7 +2007,8 @@ async fn pending_steer_recall_requires_acknowledgement_and_confirmation() {
 
     pending.source = UserMessageSource::QuestionAnswer;
     chat.input_queue.pending_steers.push_back(pending.clone());
-    chat.bottom_pane.set_composer_text(String::new());
+    chat.bottom_pane
+        .set_composer_text(String::new(), Vec::new(), Vec::new());
     chat.set_remote_image_urls(Vec::new());
     chat.request_pending_steer_recall();
     assert!(op_rx.try_recv().is_err());
