@@ -317,17 +317,26 @@ stream_max_retries = 0
         unreachable!("user turn");
     };
     let expected_client_id = client_user_message_id.clone();
-    let mut pending_input = app.chat_widget.capture_thread_input_state();
     app.submit_thread_op(&mut app_server, thread_id, steer)
         .await?;
-    pending_input
-        .as_mut()
-        .expect("pending input before acknowledgement")
-        .pending_steers
-        .iter_mut()
-        .find(|pending| pending.client_id == expected_client_id)
-        .expect("submitted steer")
-        .accepted_turn_id = Some(turn_id.clone());
+    let pending_input = app.chat_widget.capture_thread_input_state();
+    app.chat_widget
+        .handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+    let recall = std::iter::from_fn(|| app_event_rx.try_recv().ok()).find_map(|event| {
+        if let AppEvent::CodexOp(op @ AppCommand::WithdrawSteer { .. }) = event {
+            Some(op)
+        } else {
+            None
+        }
+    });
+    assert_eq!(
+        recall,
+        Some(AppCommand::WithdrawSteer {
+            thread_id,
+            turn_id: turn_id.clone(),
+            client_id: expected_client_id.clone(),
+        })
+    );
     let other_id = ThreadId::from_string(
         &app_test_support::create_fake_rollout(
             app.config.codex_home.as_path(),
