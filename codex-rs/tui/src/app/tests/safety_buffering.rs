@@ -257,9 +257,17 @@ stream_max_retries = 0
         unreachable!("user turn");
     };
     let expected_client_id = client_user_message_id.clone();
-    let pending_input = app.chat_widget.capture_thread_input_state();
+    let mut pending_input = app.chat_widget.capture_thread_input_state();
     app.submit_thread_op(&mut app_server, thread_id, steer)
         .await?;
+    pending_input
+        .as_mut()
+        .expect("pending input before acknowledgement")
+        .pending_steers
+        .iter_mut()
+        .find(|pending| pending.client_id == expected_client_id)
+        .expect("submitted steer")
+        .accepted_turn_id = Some(turn_id.clone());
     let other_id = ThreadId::from_string(
         &app_test_support::create_fake_rollout(
             app.config.codex_home.as_path(),
