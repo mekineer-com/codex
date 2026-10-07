@@ -675,9 +675,18 @@ impl App {
                 {
                     return Ok(true);
                 }
-                let response = app_server
+                let response = match app_server
                     .turn_steer_withdraw(*origin_thread, turn_id.clone(), client_id.clone())
-                    .await?;
+                    .await
+                {
+                    Ok(response) => response,
+                    Err(error @ TypedRequestError::Transport { .. }) => return Err(error.into()),
+                    Err(error) => {
+                        self.chat_widget
+                            .add_warning_message(format!("Could not recall the message: {error}"));
+                        return Ok(true);
+                    }
+                };
                 match response.status {
                     codex_app_server_protocol::TurnSteerWithdrawStatus::Withdrawn => {
                         self.chat_widget.on_pending_steer_withdrawn(client_id);

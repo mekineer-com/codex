@@ -178,6 +178,66 @@ async fn agents_overview_acknowledges_inactive_steer_before_interrupt() -> Resul
     Box::pin(interrupt_after_inactive_steer(SteerSwitch::BetweenTasks)).await
 }
 
+#[tokio::test]
+async fn pending_steer_withdrawal_rejection_preserves_input_and_running_state() -> Result<()> {
+    use super::session_lifecycle_requests::recorded_params;
+    use super::session_lifecycle_requests::start_recording_remote_app_server;
+
+    let (mut app, mut events, _ops) = make_test_app_with_channels().await;
+    let (mut server, requests, proxy) = start_recording_remote_app_server(&app.config).await?;
+    let started = server.start_thread(&app.config).await?;
+    let thread_id = started.session.thread_id;
+    app.active_thread_id = Some(thread_id);
+    app.chat_widget.handle_thread_session_quiet(started.session);
+    app.chat_widget.handle_server_notification(
+        turn_started_notification(thread_id, "fictional-running-turn"),
+        /*replay_kind*/ None,
+    );
+    submit_prompt(&mut app, "Preserve this fictional pending prompt");
+    let AppCommand::UserTurn {
+        client_user_message_id,
+        ..
+    } = next_user_turn_event(&mut events)
+    else {
+        unreachable!("user turn");
+    };
+    let before = app.chat_widget.capture_thread_input_state();
+    assert!(
+        before
+            .as_ref()
+            .expect("pending input")
+            .pending_steers
+            .iter()
+            .any(|pending| pending.client_id == client_user_message_id)
+    );
+    // Empty turn identity provokes a real server rejection, not a transport failure.
+    let op = AppCommand::WithdrawSteer {
+        thread_id,
+        turn_id: String::new(),
+        client_id: client_user_message_id,
+    };
+    assert!(
+        app.try_submit_active_thread_op_via_app_server(&mut server, thread_id, &op)
+            .await?
+    );
+    assert_eq!(app.chat_widget.capture_thread_input_state(), before);
+    assert!(app.chat_widget.is_task_running_for_test());
+    assert_eq!(recorded_params(&requests, "turn/steer/withdraw").len(), 1);
+    let messages = std::iter::from_fn(|| events.try_recv().ok())
+        .filter_map(|event| match event {
+            AppEvent::InsertHistoryCell(cell) => {
+                Some(lines_to_single_string(&cell.display_lines(/*width*/ 120)))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(messages.contains("Could not recall the message"));
+    server.shutdown().await?;
+    proxy.await??;
+    Ok(())
+}
+
 enum SteerSwitch {
     WithinTask,
     BetweenTasks,
