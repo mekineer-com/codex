@@ -233,7 +233,7 @@ async fn pending_steer_withdrawal_rejection_preserves_input_and_running_state() 
     let messages = std::iter::from_fn(|| events.try_recv().ok())
         .filter_map(|event| match event {
             AppEvent::InsertHistoryCell(cell) => {
-                Some(lines_to_single_string(&cell.display_lines(/*width*/ 120)))
+                Some(lines_to_single_string(&cell.transcript_lines(/*width*/ 120)))
             }
             _ => None,
         })
