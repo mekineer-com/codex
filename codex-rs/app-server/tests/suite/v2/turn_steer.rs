@@ -162,7 +162,7 @@ async fn pending_steer_withdrawal_keeps_tool_running_and_resubmits_once() -> Res
     );
     assert!(workdir.join("finished").exists());
     let requests = server
-        .get_received_requests()
+        .received_requests()
         .await
         .expect("recorded requests");
     let model_requests: Vec<_> = requests
