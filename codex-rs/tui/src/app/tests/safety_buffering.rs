@@ -187,8 +187,15 @@ async fn pending_steer_withdrawal_rejection_preserves_input_and_running_state() 
     let (mut server, requests, proxy) = start_recording_remote_app_server(&app.config).await?;
     let started = server.start_thread(&app.config).await?;
     let thread_id = started.session.thread_id;
-    app.active_thread_id = Some(thread_id);
-    app.chat_widget.handle_thread_session_quiet(started.session);
+    let mut tui = crate::tui::test_support::make_test_tui()?;
+    app.replace_chat_widget_with_app_server_thread(
+        &mut tui,
+        started,
+        ThreadAttachPresentation::SessionLineage,
+        /*initial_user_message*/ None,
+    )
+    .await?;
+    while events.try_recv().is_ok() {}
     app.chat_widget.handle_server_notification(
         turn_started_notification(thread_id, "fictional-running-turn"),
         /*replay_kind*/ None,
