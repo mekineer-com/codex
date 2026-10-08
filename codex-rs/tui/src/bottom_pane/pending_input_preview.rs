@@ -23,6 +23,7 @@ pub(crate) struct PendingInputPreview {
     pub pending_steers: Vec<String>,
     pub rejected_steers: Vec<String>,
     pub queued_messages: Vec<String>,
+    pub(super) pending_steers_recallable: bool,
     /// Key combination rendered in the hint line. Defaults to Shift+Left.
     pub(super) edit_binding: Option<key_hint::ShortcutHint>,
     /// Key combination rendered for immediately interrupting and sending steers.
@@ -42,6 +43,7 @@ impl PendingInputPreview {
             pending_steers: Vec::new(),
             rejected_steers: Vec::new(),
             queued_messages: Vec::new(),
+            pending_steers_recallable: false,
             edit_binding: Some(key_hint::shift(KeyCode::Left).into()),
             interrupt_binding: Some(key_hint::plain(KeyCode::Esc).into()),
         }
@@ -164,7 +166,7 @@ impl PendingInputPreview {
         }
 
         if (!self.queued_messages.is_empty()
-            || !self.pending_steers.is_empty()
+            || self.pending_steers_recallable
             || !self.rejected_steers.is_empty())
             && !has_questions
             && let Some(edit_binding) = self.edit_binding
@@ -222,6 +224,24 @@ mod tests {
     fn desired_height_empty() {
         let queue = PendingInputPreview::new();
         assert_eq!(queue.desired_height(/*width*/ 40), 0);
+    }
+
+    #[test]
+    fn sent_message_hint_requires_a_recallable_prompt() {
+        for recallable in [false, true] {
+            let mut queue = PendingInputPreview::new();
+            queue.pending_steers.push("Waiting input".to_string());
+            queue.pending_steers_recallable = recallable;
+            let width = 100;
+            let height = queue.desired_height(width);
+            let mut buf = Buffer::empty(Rect::new(0, 0, width, height));
+            queue.render(Rect::new(0, 0, width, height), &mut buf);
+            let text: String = (0..height)
+                .flat_map(|y| (0..width).map(move |x| (x, y)))
+                .map(|(x, y)| buf[(x, y)].symbol())
+                .collect();
+            assert_eq!(text.contains("recall newest message"), recallable);
+        }
     }
 
     #[test]

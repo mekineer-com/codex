@@ -379,6 +379,10 @@ impl ChatWidget {
             preview.queued_messages,
             preview.pending_steers,
             preview.rejected_steers,
+            self.input_queue
+                .pending_steers
+                .iter()
+                .any(|pending| pending.source == UserMessageSource::Prompt),
         );
     }
 

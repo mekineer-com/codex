@@ -1637,7 +1637,9 @@ impl BottomPane {
         queued: Vec<String>,
         pending_steers: Vec<String>,
         rejected_steers: Vec<String>,
+        pending_steers_recallable: bool,
     ) {
+        self.pending_input_preview.pending_steers_recallable = pending_steers_recallable;
         self.pending_input_preview.pending_steers = pending_steers;
         self.pending_input_preview.rejected_steers = rejected_steers;
         self.pending_input_preview.queued_messages = queued;
@@ -3414,6 +3416,7 @@ mod tests {
             vec!["Queued follow-up question".to_string()],
             Vec::new(),
             Vec::new(),
+            false,
         );
 
         let width = 48;
@@ -3446,6 +3449,7 @@ mod tests {
             vec!["Queued follow-up question".to_string()],
             Vec::new(),
             Vec::new(),
+            false,
         );
         pane.hide_status_indicator();
 
@@ -3479,6 +3483,7 @@ mod tests {
             vec!["Queued follow-up question".to_string()],
             Vec::new(),
             Vec::new(),
+            false,
         );
 
         let width = 48;
