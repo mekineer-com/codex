@@ -259,12 +259,15 @@ impl ChatWidget {
             match queued_message.action {
                 QueuedInputAction::Plain => {
                     let source = queued_message.source;
+                    let recall_order = queued_message.recall_order;
                     submitted_follow_up = self
-                        .submit_user_message_with_history_and_shell_escape_policy(
+                        .submit_user_message_with_prepared_images(
                             queued_message.into_user_message(),
                             history_record,
                             ShellEscapePolicy::Allow,
                             source,
+                            None,
+                            Some(recall_order),
                         )
                         .0;
                     break;
@@ -274,6 +277,7 @@ impl ChatWidget {
                         user_message,
                         pending_pastes,
                         source,
+                        recall_order,
                         ..
                     } = queued_message;
                     let mut restored_pending_pastes = self.bottom_pane.composer_pending_pastes();
@@ -300,11 +304,13 @@ impl ChatWidget {
                             );
                     }
                     submitted_follow_up = self
-                        .submit_user_message_with_history_and_shell_escape_policy(
+                        .submit_user_message_with_prepared_images(
                             user_message,
                             history_record,
                             ShellEscapePolicy::Disallow,
                             source,
+                            None,
+                            Some(recall_order),
                         )
                         .0;
                     if !submitted_follow_up {

@@ -2090,6 +2090,72 @@ async fn recall_uses_submission_order_across_local_and_server_queues() {
 }
 
 #[tokio::test]
+async fn recall_refuses_unconfirmed_input_after_reconnect() {
+    let (mut chat, _rx, mut ops) = make_chatwidget_manual(None).await;
+    while ops.try_recv().is_ok() {}
+    chat.thread_id = Some(ThreadId::new());
+    chat.input_queue
+        .queued_user_messages
+        .push_back(UserMessage::from("older local draft").into());
+    let mut pending = pending_steer("server-owned follow-up");
+    pending.accepted_turn_id = Some("active-turn".to_string());
+    chat.input_queue.pending_steers.push_back(pending);
+    let mut input = chat.capture_thread_input_state().expect("input snapshot");
+    input.reconnect_pending = true;
+    chat.restore_reconnected_input(Some(input), &[]);
+    let queued = chat.input_queue.queued_user_messages.clone();
+    assert!(
+        queued
+            .iter()
+            .any(|message| matches!(message.delivery, MessageDelivery::Unconfirmed(_)))
+    );
+    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+    assert!(chat.bottom_pane.composer_text().is_empty());
+    assert_eq!(chat.input_queue.queued_user_messages, queued);
+    assert!(ops.try_recv().is_err());
+}
+
+#[tokio::test]
+async fn queued_image_preparation_preserves_submission_order() {
+    for action in [QueuedInputAction::Plain, QueuedInputAction::Literal] {
+        let (mut chat, _rx, _ops) = make_chatwidget_manual(None).await;
+        chat.thread_id = Some(ThreadId::new());
+        chat.snapshot_local_images = true;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("image.png");
+        image::RgbImage::new(2, 2).save(&path).unwrap();
+        let image_message = QueuedUserMessage::new(
+            UserMessage {
+                local_images: vec![LocalImageAttachment {
+                    placeholder: "[Image #1]".into(),
+                    path,
+                }],
+                ..UserMessage::from("older image prompt")
+            },
+            action,
+        );
+        let order = image_message.recall_order;
+        chat.input_queue
+            .queued_user_messages
+            .push_back(image_message);
+        chat.input_queue
+            .queued_user_messages
+            .push_back(UserMessage::from("newer text prompt").into());
+        assert!(chat.maybe_send_next_queued_input());
+        assert_eq!(
+            chat.pending_image_submission
+                .as_ref()
+                .expect("preparing images")
+                .recall_order,
+            order
+        );
+        chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+        assert_eq!(chat.bottom_pane.composer_text(), "newer text prompt");
+        assert!(chat.pending_image_submission.is_some());
+    }
+}
+
+#[tokio::test]
 async fn unbound_queued_message_edit_does_not_fall_back_to_alt_up() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     let mut config = codex_config::types::TuiKeymap::default();

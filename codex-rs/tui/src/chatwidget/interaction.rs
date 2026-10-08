@@ -202,10 +202,6 @@ impl ChatWidget {
                 self.refresh_startup_recovery();
                 self.refresh_pending_input_preview();
                 self.request_redraw();
-            } else if self.pending_image_submission.is_some() {
-                self.cancel_image_submission();
-            } else {
-                self.request_pending_steer_recall();
             }
             return KeyEventAction::None;
         }
