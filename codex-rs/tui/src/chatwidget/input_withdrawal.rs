@@ -24,8 +24,8 @@ impl ChatWidget {
             .input_queue
             .pending_steers
             .iter()
-            .rev()
-            .find(|pending| pending.source == UserMessageSource::Prompt)
+            .filter(|pending| pending.source == UserMessageSource::Prompt)
+            .max_by_key(|pending| pending.recall_order)
         else {
             return;
         };

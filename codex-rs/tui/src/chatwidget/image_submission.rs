@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 static IMAGE_PREPARATION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 pub(super) struct PendingImageSubmission {
+    pub(super) recall_order: u64,
     id: uuid::Uuid,
     pub(super) message: UserMessage,
     history_record: UserMessageHistoryRecord,
@@ -25,6 +26,7 @@ impl ChatWidget {
         message: UserMessage,
         history_record: UserMessageHistoryRecord,
         source: UserMessageSource,
+        recall_order: u64,
     ) {
         let id = uuid::Uuid::new_v4();
         let images = message.local_images.clone();
@@ -48,6 +50,7 @@ impl ChatWidget {
             }
         });
         self.pending_image_submission = Some(PendingImageSubmission {
+            recall_order,
             id,
             message,
             history_record,
@@ -77,6 +80,7 @@ impl ChatWidget {
                     ShellEscapePolicy::Disallow,
                     pending.source,
                     Some(images),
+                    Some(pending.recall_order),
                 );
                 if !accepted {
                     self.input_queue.recovered_queue |=
@@ -102,6 +106,7 @@ impl ChatWidget {
             self.input_queue
                 .queued_user_messages
                 .push_front(QueuedUserMessage {
+                    recall_order: pending.recall_order,
                     source: pending.source,
                     ..QueuedUserMessage::new(pending.message, QueuedInputAction::Literal)
                 });

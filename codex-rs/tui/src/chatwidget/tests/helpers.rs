@@ -1081,6 +1081,7 @@ pub(super) fn complete_assistant_message(
 
 pub(super) fn pending_steer(text: &str) -> PendingSteer {
     PendingSteer {
+        recall_order: super::super::recall_order::next_input_order(),
         client_id: "test-submission".to_string(),
         accepted_turn_id: None,
         user_message: UserMessage::from(text),

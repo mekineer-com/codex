@@ -123,6 +123,7 @@ impl ChatWidget {
             shell_escape_policy,
             source,
             /*prepared_images*/ None,
+            /*recall_order*/ None,
         )
     }
 
@@ -133,7 +134,9 @@ impl ChatWidget {
         shell_escape_policy: ShellEscapePolicy,
         source: UserMessageSource,
         prepared_images: Option<Vec<UserInput>>,
+        recall_order: Option<u64>,
     ) -> (bool, Option<AppCommand>) {
+        let recall_order = recall_order.unwrap_or_else(super::recall_order::next_input_order);
         self.bottom_pane.dismiss_composer_sparkle();
         if self.has_misalignment_policy_violation() {
             return (false, None);
@@ -152,6 +155,7 @@ impl ChatWidget {
             self.input_queue.queued_user_messages.insert(
                 queue_index,
                 QueuedUserMessage {
+                    recall_order,
                     source,
                     ..QueuedUserMessage::new(
                         user_message,
@@ -179,6 +183,7 @@ impl ChatWidget {
             self.input_queue
                 .queued_user_messages
                 .push_front(QueuedUserMessage {
+                    recall_order,
                     source,
                     ..QueuedUserMessage::from(user_message)
                 });
@@ -262,6 +267,7 @@ impl ChatWidget {
                 },
                 history_record,
                 source,
+                recall_order,
             );
             return (true, None);
         } else {
@@ -426,6 +432,7 @@ impl ChatWidget {
         let client_user_message_id = uuid::Uuid::new_v4().to_string();
         crate::startup_recovery::bind_submission(&text, &client_user_message_id);
         let pending_steer = (!render_in_history).then(|| PendingSteer {
+            recall_order,
             client_id: client_user_message_id.clone(),
             accepted_turn_id: None,
             user_message: UserMessage {

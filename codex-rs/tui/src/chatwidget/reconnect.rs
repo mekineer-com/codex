@@ -59,6 +59,7 @@ impl ChatWidget {
                 && let Some(prompt) = input.safety_buffering_prompt.take()
             {
                 input.queued_user_messages.push_front(QueuedUserMessage {
+                    recall_order: 0,
                     source: input.safety_buffering_source,
                     delivery: if input.reconnect_pending {
                         MessageDelivery::Unconfirmed(input.pending_user_message_client_id.take())
@@ -141,6 +142,7 @@ impl ChatWidget {
             self.input_queue
                 .queued_user_messages
                 .push_front(QueuedUserMessage {
+                    recall_order: 0,
                     source: self.safety_buffering_source,
                     delivery: MessageDelivery::Unconfirmed(
                         self.input_queue.pending_user_message_client_id.clone(),
@@ -169,14 +171,18 @@ impl ChatWidget {
             return;
         }
         if key.kind == KeyEventKind::Press && self.chat_keymap.edit_queued_message.is_pressed(key) {
-            if let Some(composer) = self.pop_latest_queued_composer_state() {
+            if let Some(super::recall_order::RecallTarget::Pending(index)) =
+                self.input_queue.newest_recall_target(true, None)
+            {
+                if let Some(steer) = self.input_queue.pending_steers.remove(index) {
+                    self.restore_user_message_to_composer(user_message_for_restore(
+                        steer.user_message,
+                        &steer.history_record,
+                    ));
+                    self.input_queue.recovered_queue &= !self.input_queue.pending_steers.is_empty();
+                }
+            } else if let Some(composer) = self.pop_latest_queued_composer_state() {
                 self.restore_composer_state(composer);
-            } else if let Some(steer) = self.input_queue.pending_steers.pop_back() {
-                self.restore_user_message_to_composer(user_message_for_restore(
-                    steer.user_message,
-                    &steer.history_record,
-                ));
-                self.input_queue.recovered_queue &= !self.input_queue.pending_steers.is_empty();
             }
             self.bottom_pane.handle_restricted_key(
                 KeyEvent::new(KeyCode::Null, KeyModifiers::NONE),

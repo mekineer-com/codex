@@ -387,6 +387,7 @@ async fn parent_owned_thread_restores_pending_initial_prompt() {
 async fn parent_owned_thread_preserves_queued_input_before_draining() {
     let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ Some("gpt-5")).await;
     let queued_message = QueuedUserMessage {
+        recall_order: 0,
         user_message: UserMessage::from("keep this queued prompt"),
         action: QueuedInputAction::Plain,
         delivery: MessageDelivery::Unsent,
@@ -1817,11 +1818,13 @@ async fn restore_thread_input_state_applies_running_state_policy() {
         safety_buffering_prompt: Some(UserMessage::from("buffered prompt")),
         safety_buffering_source: UserMessageSource::Prompt,
         pending_steers: VecDeque::from([PendingSteer {
+            recall_order: 0,
             history_record: pending_history.clone(),
             ..pending_steer("submitted to the interrupted turn")
         }]),
         rejected_steers_queue: VecDeque::new(),
         rejected_steer_sources: VecDeque::new(),
+        rejected_steer_orders: VecDeque::new(),
         rejected_steer_history_records: VecDeque::new(),
         queued_user_messages: VecDeque::from([UserMessage::from("already queued").into()]),
         queued_user_message_history_records: VecDeque::from([queued_history.clone()]),
@@ -2013,6 +2016,77 @@ async fn pending_steer_recall_requires_acknowledgement_and_confirmation() {
     chat.request_pending_steer_recall();
     assert!(op_rx.try_recv().is_err());
     assert_eq!(chat.input_queue.pending_steers, VecDeque::from([pending]));
+}
+
+#[tokio::test]
+async fn recall_uses_submission_order_across_local_and_server_queues() {
+    for pending_is_newest in [true, false] {
+        let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(Some("gpt-5")).await;
+        while op_rx.try_recv().is_ok() {}
+        let thread_id = ThreadId::new();
+        chat.thread_id = Some(thread_id);
+        chat.bottom_pane.set_task_running(true);
+        let (queued, mut pending): (QueuedUserMessage, PendingSteer) = if pending_is_newest {
+            (
+                UserMessage::from("local draft").into(),
+                pending_steer("sent follow-up"),
+            )
+        } else {
+            let pending = pending_steer("sent follow-up");
+            (UserMessage::from("local draft").into(), pending)
+        };
+        pending.accepted_turn_id = Some("active-turn".to_string());
+        chat.input_queue
+            .queued_user_messages
+            .push_back(queued.clone());
+        chat.input_queue.pending_steers.push_back(pending.clone());
+        let saved = chat.capture_thread_input_state().expect("input snapshot");
+        chat.restore_thread_input_state(
+            Some(saved),
+            ThreadInputStateRestoreMode {
+                preserve_in_flight_turn: true,
+            },
+        );
+
+        // Plain Up retains history navigation; it must not withdraw queued input.
+        chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+        assert!(op_rx.try_recv().is_err());
+        assert_eq!(chat.input_queue.queued_user_messages.len(), 1);
+        assert_eq!(chat.input_queue.pending_steers.len(), 1);
+        chat.bottom_pane
+            .set_composer_text(String::new(), Vec::new(), Vec::new());
+        chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+        if pending_is_newest {
+            assert_eq!(
+                op_rx.try_recv().expect("withdrawal request"),
+                Op::WithdrawSteer {
+                    thread_id,
+                    turn_id: "active-turn".to_string(),
+                    client_id: pending.client_id.clone(),
+                }
+            );
+            assert!(chat.bottom_pane.composer_text().is_empty());
+            assert_eq!(
+                chat.input_queue.queued_user_messages,
+                VecDeque::from([queued])
+            );
+            chat.on_pending_steer_withdrawn(&pending.client_id);
+            assert_eq!(chat.bottom_pane.composer_text(), "sent follow-up");
+        } else {
+            assert!(op_rx.try_recv().is_err());
+            assert_eq!(chat.bottom_pane.composer_text(), "local draft");
+            assert_eq!(chat.input_queue.pending_steers, VecDeque::from([pending]));
+        }
+        chat.bottom_pane
+            .set_composer_text(String::new(), Vec::new(), Vec::new());
+        chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+        if pending_is_newest {
+            assert!(op_rx.try_recv().is_err());
+            assert_eq!(chat.bottom_pane.composer_text(), "local draft");
+        } else {
+            assert!(matches!(op_rx.try_recv(), Ok(Op::WithdrawSteer { .. })));
+        }
+    }
 }
 
 #[tokio::test]

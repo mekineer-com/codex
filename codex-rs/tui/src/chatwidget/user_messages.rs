@@ -75,6 +75,7 @@ pub(super) enum MessageDelivery {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct QueuedUserMessage {
+    pub(super) recall_order: u64,
     pub(super) user_message: UserMessage,
     pub(super) action: QueuedInputAction,
     pub(super) delivery: MessageDelivery,
@@ -86,6 +87,7 @@ impl QueuedUserMessage {
     pub(super) fn new(user_message: UserMessage, action: QueuedInputAction) -> Self {
         Self {
             user_message,
+            recall_order: super::recall_order::next_input_order(),
             action,
             delivery: MessageDelivery::Unsent,
             pending_pastes: Vec::new(),
@@ -150,6 +152,7 @@ pub(crate) struct ThreadInputState {
     pub(crate) pending_steers: VecDeque<PendingSteer>,
     pub(super) rejected_steers_queue: VecDeque<UserMessage>,
     pub(super) rejected_steer_sources: VecDeque<UserMessageSource>,
+    pub(super) rejected_steer_orders: VecDeque<u64>,
     pub(super) rejected_steer_history_records: VecDeque<UserMessageHistoryRecord>,
     pub(super) queued_user_messages: VecDeque<QueuedUserMessage>,
     pub(super) queued_user_message_history_records: VecDeque<UserMessageHistoryRecord>,
@@ -199,6 +202,7 @@ impl From<&str> for UserMessage {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PendingSteer {
+    pub(super) recall_order: u64,
     /// Preserved across request retries and thread switches until this submission commits.
     pub(crate) client_id: String,
     /// Server acknowledgement, not the possibly newer visible turn.

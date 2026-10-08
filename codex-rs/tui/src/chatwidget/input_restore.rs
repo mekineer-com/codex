@@ -215,6 +215,12 @@ impl ChatWidget {
                 .rejected_steer_sources
                 .drain(..count.min(self.input_queue.rejected_steer_sources.len()))
                 .collect::<Vec<_>>();
+            let recall_order = self
+                .input_queue
+                .rejected_steer_orders
+                .drain(..count.min(self.input_queue.rejected_steer_orders.len()))
+                .max()
+                .unwrap_or(0);
             let source = if !rejected_messages.is_empty()
                 && sources.len() == rejected_messages.len()
                 && sources
@@ -242,6 +248,7 @@ impl ChatWidget {
             );
             Some((
                 QueuedUserMessage {
+                    recall_order,
                     source,
                     ..QueuedUserMessage::from(message)
                 },
@@ -251,13 +258,16 @@ impl ChatWidget {
     }
 
     pub(super) fn pop_latest_queued_composer_state(&mut self) -> Option<ThreadComposerState> {
-        if let Some(user_message) = self.input_queue.queued_user_messages.pop_back() {
+        use super::recall_order::RecallTarget;
+        let target = self.input_queue.newest_recall_target(false, None)?;
+        if let RecallTarget::Queued(index) = target {
+            let user_message = self.input_queue.queued_user_messages.remove(index)?;
             self.input_queue.recovered_queue &= self.input_queue.has_queued_follow_up_messages()
                 || !self.input_queue.pending_steers.is_empty();
             let history_record = self
                 .input_queue
                 .queued_user_message_history_records
-                .pop_back()
+                .remove(index)
                 .unwrap_or(UserMessageHistoryRecord::UserMessageText);
             let QueuedUserMessage {
                 user_message,
@@ -269,14 +279,18 @@ impl ChatWidget {
                 pending_pastes,
             ))
         } else {
-            let user_message = self.input_queue.rejected_steers_queue.pop_back()?;
-            self.input_queue.rejected_steer_sources.pop_back();
+            let RecallTarget::Rejected(index) = target else {
+                return None;
+            };
+            let user_message = self.input_queue.rejected_steers_queue.remove(index)?;
+            self.input_queue.rejected_steer_sources.remove(index);
+            self.input_queue.rejected_steer_orders.remove(index);
             self.input_queue.recovered_queue &= self.input_queue.has_queued_follow_up_messages()
                 || !self.input_queue.pending_steers.is_empty();
             let history_record = self
                 .input_queue
                 .rejected_steer_history_records
-                .pop_back()
+                .remove(index)
                 .unwrap_or(UserMessageHistoryRecord::UserMessageText);
             Some(Self::composer_state_from_user_message(
                 user_message_for_restore(user_message, &history_record),
@@ -298,6 +312,9 @@ impl ChatWidget {
         self.input_queue
             .rejected_steer_sources
             .push_back(pending_steer.source);
+        self.input_queue
+            .rejected_steer_orders
+            .push_back(pending_steer.recall_order);
         self.input_queue
             .rejected_steer_history_records
             .push_back(pending_steer.history_record);
@@ -358,6 +375,9 @@ impl ChatWidget {
                     self.input_queue
                         .rejected_steer_sources
                         .push_back(pending.source);
+                    self.input_queue
+                        .rejected_steer_orders
+                        .push_back(pending.recall_order);
                     self.input_queue
                         .rejected_steer_history_records
                         .push_back(pending.history_record);
@@ -422,6 +442,7 @@ impl ChatWidget {
             .drain(..)
             .collect::<Vec<_>>();
         self.input_queue.rejected_steer_sources.clear();
+        self.input_queue.rejected_steer_orders.clear();
         let mut rejected_history_records = self
             .input_queue
             .rejected_steer_history_records
@@ -577,6 +598,7 @@ impl ChatWidget {
             pending_steers: self.input_queue.pending_steers.clone(),
             rejected_steers_queue: self.input_queue.rejected_steers_queue.clone(),
             rejected_steer_sources: self.input_queue.rejected_steer_sources.clone(),
+            rejected_steer_orders: self.input_queue.rejected_steer_orders.clone(),
             rejected_steer_history_records: self.input_queue.rejected_steer_history_records.clone(),
             queued_user_messages: self.input_queue.queued_user_messages.clone(),
             queued_user_message_history_records: self
@@ -637,6 +659,7 @@ impl ChatWidget {
                 self.input_queue.pending_steers.clear();
                 for pending in pending_steers.into_iter().rev() {
                     queued_user_messages.push_front(QueuedUserMessage {
+                        recall_order: pending.recall_order,
                         source: pending.source,
                         delivery: if input_state.reconnect_pending {
                             MessageDelivery::Unconfirmed(Some(pending.client_id))
@@ -650,6 +673,10 @@ impl ChatWidget {
             }
             self.input_queue.rejected_steers_queue = input_state.rejected_steers_queue;
             self.input_queue.rejected_steer_sources = input_state.rejected_steer_sources;
+            self.input_queue.rejected_steer_orders = input_state.rejected_steer_orders;
+            self.input_queue
+                .rejected_steer_orders
+                .resize(self.input_queue.rejected_steers_queue.len(), 0);
             self.input_queue.rejected_steer_sources.resize(
                 self.input_queue.rejected_steers_queue.len(),
                 UserMessageSource::Prompt,

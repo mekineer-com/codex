@@ -204,6 +204,7 @@ impl ChatWidget {
             self.input_queue
                 .queued_user_messages
                 .push_back(QueuedUserMessage {
+                    recall_order: super::recall_order::next_input_order(),
                     user_message,
                     action,
                     delivery: MessageDelivery::Unsent,

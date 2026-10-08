@@ -289,6 +289,7 @@ mod input_submission;
 mod input_withdrawal;
 mod interrupts;
 mod questions;
+mod recall_order;
 mod startup_submission;
 use self::interrupts::InterruptManager;
 mod keymap_picker;

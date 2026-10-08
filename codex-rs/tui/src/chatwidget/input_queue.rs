@@ -38,6 +38,7 @@ pub(super) struct InputQueueState {
     pub(super) rejected_steers_queue: VecDeque<UserMessage>,
     /// The origin of each rejected steer, kept in lockstep with its message.
     pub(super) rejected_steer_sources: VecDeque<UserMessageSource>,
+    pub(super) rejected_steer_orders: VecDeque<u64>,
     /// History records for rejected steers. Slash commands such as `/goal` can
     /// render history that differs from the text submitted to core, so this stays
     /// in lockstep with `rejected_steers_queue`, with missing entries treated as
@@ -57,6 +58,41 @@ pub(super) struct InputQueueState {
 }
 
 impl InputQueueState {
+    pub(super) fn newest_recall_target(
+        &self,
+        include_pending: bool,
+        image_order: Option<u64>,
+    ) -> Option<super::recall_order::RecallTarget> {
+        use super::recall_order::{RecallTarget, newest_input};
+        let queued = self
+            .queued_user_messages
+            .iter()
+            .enumerate()
+            .map(|(index, message)| (RecallTarget::Queued(index), message.recall_order));
+        let rejected = self
+            .rejected_steers_queue
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                (
+                    RecallTarget::Rejected(index),
+                    self.rejected_steer_orders.get(index).copied().unwrap_or(0),
+                )
+            });
+        let pending = self
+            .pending_steers
+            .iter()
+            .enumerate()
+            .filter(|(_, message)| include_pending && message.source == UserMessageSource::Prompt)
+            .map(|(index, message)| (RecallTarget::Pending(index), message.recall_order));
+        newest_input(
+            queued
+                .chain(rejected)
+                .chain(pending)
+                .chain(image_order.map(|order| (RecallTarget::PreparingImages, order))),
+        )
+    }
+
     pub(super) fn submissions_paused(&self) -> bool {
         self.suppress_queue_autosend || self.transcript_copy.strong_count() > 0
     }
@@ -80,6 +116,7 @@ impl InputQueueState {
         self.pending_user_message_client_id = None;
         self.rejected_steers_queue.clear();
         self.rejected_steer_sources.clear();
+        self.rejected_steer_orders.clear();
         self.rejected_steer_history_records.clear();
         self.pending_steers.clear();
         self.submit_pending_steers_after_interrupt = false;
@@ -138,6 +175,7 @@ mod tests {
             .rejected_steers_queue
             .push_back(UserMessage::from("rejected"));
         state.pending_steers.push_back(PendingSteer {
+            recall_order: 0,
             client_id: "test-submission".to_string(),
             accepted_turn_id: None,
             user_message: UserMessage::from("pending"),

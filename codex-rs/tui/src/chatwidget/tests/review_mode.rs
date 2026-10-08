@@ -424,6 +424,7 @@ async fn restore_thread_input_state_restores_pending_steers_without_downgrading_
             pending_steers: VecDeque::from([expected_pending.clone()]),
             rejected_steers_queue,
             rejected_steer_sources: VecDeque::new(),
+            rejected_steer_orders: VecDeque::new(),
             rejected_steer_history_records: VecDeque::new(),
             queued_user_messages,
             queued_user_message_history_records: VecDeque::new(),

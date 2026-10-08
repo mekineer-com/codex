@@ -178,7 +178,26 @@ impl ChatWidget {
                 || !self.input_queue.pending_steers.is_empty())
             && self.bottom_pane.no_modal_or_popup_active()
         {
-            if let Some(composer) = self.pop_latest_queued_composer_state() {
+            if !self.composer_is_empty_for_recall() {
+                self.add_warning_message(
+                    "Clear the input field before recalling a queued message.".to_string(),
+                );
+            } else if matches!(
+                self.input_queue.newest_recall_target(
+                    true,
+                    self.pending_image_submission
+                        .as_ref()
+                        .map(|pending| pending.recall_order)
+                ),
+                Some(super::recall_order::RecallTarget::PreparingImages)
+            ) {
+                self.cancel_image_submission();
+            } else if matches!(
+                self.input_queue.newest_recall_target(true, None),
+                Some(super::recall_order::RecallTarget::Pending(_))
+            ) {
+                self.request_pending_steer_recall();
+            } else if let Some(composer) = self.pop_latest_queued_composer_state() {
                 self.restore_composer_state(composer);
                 self.refresh_startup_recovery();
                 self.refresh_pending_input_preview();

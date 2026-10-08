@@ -223,6 +223,7 @@ impl ChatWidget {
             self.input_queue
                 .queued_user_messages
                 .push_front(QueuedUserMessage {
+                    recall_order: 0,
                     source: self.safety_buffering_source,
                     ..QueuedUserMessage::from(prompt)
                 });
