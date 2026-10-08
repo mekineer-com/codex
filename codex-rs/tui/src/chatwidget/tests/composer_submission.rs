@@ -2130,6 +2130,8 @@ async fn disconnected_recall_preserves_upstream_answer_recovery_and_held_drafts(
 async fn retiring_the_last_recovered_input_releases_the_queue_pause() {
     for retirement in ["consumed", "receipt", "interrupted"] {
         let (mut chat, _rx, _ops) = make_chatwidget_manual(None).await;
+        chat.thread_id = Some(ThreadId::new());
+        handle_turn_started(&mut chat, "turn-1");
         chat.input_queue.recovered_queue = true;
         let pending = pending_steer("waiting prompt");
         if retirement == "receipt" {
