@@ -2171,12 +2171,14 @@ async fn reserve_recovery_preserves_the_initial_submission_order() {
     chat.input_queue.recovered_queue = true;
     chat.submit_user_message(UserMessage::from("newer initial prompt"));
     assert!(chat.safety_buffering_order > older_order);
-    chat.backend_banner_state.banner = Some(
-        serde_json::from_value(serde_json::json!({
+    let response = serde_json::from_value(serde_json::json!({
+        "accountId": "test-account", "rateLimits": {},
+        "rateLimitUpsell": {
             "banner_type": "luna_reserve", "title": "Reserve", "description": "", "ctas": []
-        }))
-        .unwrap(),
-    );
+        }
+    }))
+    .unwrap();
+    chat.update_backend_banner(&response);
     assert!(chat.defer_pending_turn_for_luna_reserve());
     assert_eq!(
         chat.pop_latest_queued_composer_state()
