@@ -261,16 +261,6 @@ impl ChatWidget {
         use super::recall_order::RecallTarget;
         let target = self.input_queue.newest_recall_target(false, None)?;
         if let RecallTarget::Queued(index) = target {
-            if matches!(
-                self.input_queue.queued_user_messages.get(index)?.delivery,
-                MessageDelivery::Unconfirmed(_)
-            ) {
-                self.add_warning_message(
-                    "Can't recall this message until the server confirms whether it was sent."
-                        .to_string(),
-                );
-                return None;
-            }
             let user_message = self.input_queue.queued_user_messages.remove(index)?;
             self.input_queue.recovered_queue &= self.input_queue.has_queued_follow_up_messages()
                 || !self.input_queue.pending_steers.is_empty();

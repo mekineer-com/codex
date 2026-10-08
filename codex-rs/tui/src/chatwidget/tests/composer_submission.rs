@@ -2091,7 +2091,7 @@ async fn recall_uses_submission_order_across_local_and_server_queues() {
 }
 
 #[tokio::test]
-async fn recall_refuses_unconfirmed_input_after_reconnect() {
+async fn recall_recovers_unconfirmed_input_after_reconnect_like_upstream() {
     let (mut chat, _rx, mut ops) = make_chatwidget_manual(None).await;
     while ops.try_recv().is_ok() {}
     chat.thread_id = Some(ThreadId::new());
@@ -2111,8 +2111,18 @@ async fn recall_refuses_unconfirmed_input_after_reconnect() {
             .any(|message| matches!(message.delivery, MessageDelivery::Unconfirmed(_)))
     );
     chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
-    assert!(chat.bottom_pane.composer_text().is_empty());
-    assert_eq!(chat.input_queue.queued_user_messages, queued);
+    assert_eq!(chat.bottom_pane.composer_text(), "server-owned follow-up");
+    assert_eq!(
+        chat.input_queue.queued_user_messages.len(),
+        queued.len() - 1
+    );
+    assert!(!chat.input_queue.has_unconfirmed_messages());
+    assert_eq!(chat.queued_user_message_texts(), vec!["older local draft"]);
+    chat.bottom_pane
+        .set_composer_text(String::new(), Vec::new(), Vec::new());
+    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+    assert_eq!(chat.bottom_pane.composer_text(), "older local draft");
+    assert!(chat.input_queue.queued_user_messages.is_empty());
     assert!(ops.try_recv().is_err());
 }
 
