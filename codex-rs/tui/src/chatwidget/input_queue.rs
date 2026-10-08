@@ -63,7 +63,7 @@ impl InputQueueState {
         include_pending: bool,
         image_order: Option<u64>,
     ) -> Option<super::recall_order::RecallTarget> {
-        use super::recall_order::{RecallTarget, newest_input};
+        use super::recall_order::RecallTarget;
         let queued = self
             .queued_user_messages
             .iter()
@@ -85,12 +85,12 @@ impl InputQueueState {
             .enumerate()
             .filter(|(_, message)| include_pending && message.source == UserMessageSource::Prompt)
             .map(|(index, message)| (RecallTarget::Pending(index), message.recall_order));
-        newest_input(
-            queued
-                .chain(rejected)
-                .chain(pending)
-                .chain(image_order.map(|order| (RecallTarget::PreparingImages, order))),
-        )
+        queued
+            .chain(rejected)
+            .chain(pending)
+            .chain(image_order.map(|order| (RecallTarget::PreparingImages, order)))
+            .max_by_key(|(_, order)| *order)
+            .map(|(target, _)| target)
     }
 
     pub(super) fn submissions_paused(&self) -> bool {
