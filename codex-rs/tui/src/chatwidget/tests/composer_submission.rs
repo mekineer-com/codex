@@ -1930,6 +1930,7 @@ async fn restore_thread_input_state_applies_running_state_policy() {
 #[tokio::test]
 async fn default_shortcuts_edit_most_recent_queued_message() {
     for key in [
+        KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
         KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT),
         KeyEvent::new(KeyCode::Up, KeyModifiers::ALT),
     ] {
@@ -1970,15 +1971,31 @@ async fn pending_steer_recall_requires_acknowledgement_and_confirmation() {
 
     chat.acknowledge_pending_steer(&pending.client_id, "acknowledged-turn".to_string());
     pending.accepted_turn_id = Some("acknowledged-turn".to_string());
-    chat.bottom_pane
-        .set_composer_text("new draft".to_string(), Vec::new(), Vec::new());
-    chat.request_pending_steer_recall();
+    chat.bottom_pane.set_composer_text(
+        "new draft\nsecond line".to_string(),
+        Vec::new(),
+        Vec::new(),
+    );
+    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
     assert!(op_rx.try_recv().is_err());
-    assert_eq!(chat.bottom_pane.composer_text(), "new draft");
+    assert_eq!(chat.bottom_pane.composer_text(), "new draft\nsecond line");
 
     chat.bottom_pane
         .set_composer_text(String::new(), Vec::new(), Vec::new());
-    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
+    chat.input_queue
+        .queued_user_messages
+        .push_back(UserMessage::from("local queued prompt".to_string()).into());
+    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+    assert_eq!(chat.bottom_pane.composer_text(), "local queued prompt");
+    assert!(op_rx.try_recv().is_err());
+    assert_eq!(
+        chat.input_queue.pending_steers,
+        VecDeque::from([pending.clone()])
+    );
+
+    chat.bottom_pane
+        .set_composer_text(String::new(), Vec::new(), Vec::new());
+    chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
     assert_eq!(
         op_rx.try_recv().expect("withdrawal request"),
         Op::WithdrawSteer {

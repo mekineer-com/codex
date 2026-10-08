@@ -171,8 +171,21 @@ impl ChatWidget {
             _ => {}
         }
 
+        let recall_with_up = key_hint::plain(KeyCode::Up).is_press(key_event)
+            && self.composer_is_empty_for_recall()
+            && self
+                .bottom_pane
+                .questions
+                .as_ref()
+                .is_none_or(|q| !q.expanded)
+            && (self.has_queued_follow_up_messages()
+                || self
+                    .input_queue
+                    .pending_steers
+                    .iter()
+                    .any(|pending| pending.source == UserMessageSource::Prompt));
         if key_event.kind == KeyEventKind::Press
-            && self.chat_keymap.edit_queued_message.is_pressed(key_event)
+            && (recall_with_up || self.chat_keymap.edit_queued_message.is_pressed(key_event))
             && (self.has_queued_follow_up_messages()
                 || self.pending_image_submission.is_some()
                 || !self.input_queue.pending_steers.is_empty())
