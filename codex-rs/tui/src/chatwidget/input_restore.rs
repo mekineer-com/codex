@@ -418,6 +418,7 @@ impl ChatWidget {
         } else if let Some(combined) = self.drain_pending_messages_for_restore() {
             self.restore_composer_state(combined);
         }
+        self.input_queue.refresh_recovered_queue();
         self.refresh_pending_input_preview();
         self.request_redraw();
     }

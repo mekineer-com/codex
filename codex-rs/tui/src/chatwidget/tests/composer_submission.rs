@@ -2127,6 +2127,37 @@ async fn disconnected_recall_preserves_upstream_answer_recovery_and_held_drafts(
 }
 
 #[tokio::test]
+async fn retiring_the_last_recovered_input_releases_the_queue_pause() {
+    for retirement in ["consumed", "receipt", "interrupted"] {
+        let (mut chat, _rx, _ops) = make_chatwidget_manual(None).await;
+        chat.input_queue.recovered_queue = true;
+        let pending = pending_steer("waiting prompt");
+        if retirement == "receipt" {
+            chat.input_queue
+                .queued_user_messages
+                .push_back(QueuedUserMessage {
+                    delivery: MessageDelivery::Unconfirmed(Some(pending.client_id.clone())),
+                    ..UserMessage::from("waiting prompt").into()
+                });
+            chat.reconcile_recovered_messages(&[pending.client_id]);
+        } else {
+            chat.input_queue.pending_steers.push_back(pending);
+            match retirement {
+                "consumed" => complete_user_message(&mut chat, "committed-item", "waiting prompt"),
+                "interrupted" => chat.on_interrupted_turn(TurnAbortReason::Interrupted),
+                _ => unreachable!(),
+            }
+        }
+        assert!(chat.input_queue.pending_steers.is_empty());
+        assert!(chat.input_queue.queued_user_messages.is_empty());
+        assert!(
+            !chat.input_queue.recovered_queue,
+            "pause survived {retirement}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn recall_recovers_unconfirmed_input_after_reconnect_like_upstream() {
     let (mut chat, _rx, mut ops) = make_chatwidget_manual(None).await;
     while ops.try_recv().is_ok() {}

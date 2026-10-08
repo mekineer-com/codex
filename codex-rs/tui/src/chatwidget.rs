@@ -1342,6 +1342,7 @@ impl ChatWidget {
             })
         {
             if let Some(pending) = self.input_queue.pending_steers.pop_front() {
+                self.input_queue.refresh_recovered_queue();
                 self.refresh_pending_input_preview();
                 let pending_display =
                     user_message_display_for_history(pending.user_message, &pending.history_record);

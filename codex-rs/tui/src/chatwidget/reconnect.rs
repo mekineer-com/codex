@@ -124,6 +124,7 @@ impl ChatWidget {
             }
             !confirmed
         });
+        self.input_queue.refresh_recovered_queue();
         self.refresh_pending_input_preview();
     }
 
