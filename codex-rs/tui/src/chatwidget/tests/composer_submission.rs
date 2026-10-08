@@ -2281,7 +2281,7 @@ async fn unbound_queued_message_edit_does_not_fall_back_to_alt_up() {
         .push_back(UserMessage::from("queued".to_string()).into());
     chat.refresh_pending_input_preview();
 
-    assert!(!render_bottom_popup(&chat, /*width*/ 100).contains("edit last queued message"));
+    assert!(!render_bottom_popup(&chat, /*width*/ 100).contains("recall newest message"));
     chat.handle_key_event(KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT));
     chat.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT));
 
@@ -2311,10 +2311,10 @@ async fn queued_message_edit_hint_displays_configured_chords() {
         prefix: crate::key_hint::ctrl(KeyCode::Char('x')),
         completion: crate::key_hint::plain(KeyCode::Up),
     };
-    assert!(render_bottom_popup(&chat, /*width*/ 100).contains(&format!(
-        "{} edit last queued message",
-        hint.display_label()
-    )));
+    assert!(
+        render_bottom_popup(&chat, /*width*/ 100)
+            .contains(&format!("{} recall newest message", hint.display_label()))
+    );
 }
 
 /// Pressing Up to recall the most recent history entry and immediately queuing

@@ -264,6 +264,20 @@ async fn reconnect_restores_history_permissions_and_resumes_unsent_input() -> Re
                 TuiEvent::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT)),
             )
             .await?;
+            assert_eq!(app.chat_widget.composer_text_with_pending(), "kept draft");
+            assert!(app.chat_widget.has_queued_follow_up_messages());
+            app.handle_tui_event(
+                &mut tui,
+                &mut session,
+                TuiEvent::Key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL)),
+            )
+            .await?;
+            app.handle_tui_event(
+                &mut tui,
+                &mut session,
+                TuiEvent::Key(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT)),
+            )
+            .await?;
             assert!(!app.chat_widget.has_queued_follow_up_messages());
             assert!(
                 !app.chat_widget
@@ -429,6 +443,12 @@ async fn reconnect_restores_history_permissions_and_resumes_unsent_input() -> Re
         if edit_offline {
             assert!(app.chat_widget.has_queued_follow_up_messages());
             assert!(!app.chat_widget.maybe_send_next_queued_input());
+            app.handle_tui_event(
+                &mut tui,
+                &mut session,
+                TuiEvent::Key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL)),
+            )
+            .await?;
             app.handle_tui_event(
                 &mut tui,
                 &mut session,
