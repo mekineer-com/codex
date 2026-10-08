@@ -328,7 +328,11 @@ impl ChatWidget {
                     }
                 }
                 QueuedInputAction::RunShell => {
-                    let drain = self.submit_queued_shell_prompt(queued_message.into_user_message());
+                    let recall_order = queued_message.recall_order;
+                    let drain = self.submit_queued_shell_prompt(
+                        queued_message.into_user_message(),
+                        recall_order,
+                    );
                     if drain == QueueDrain::Stop {
                         submitted_follow_up = self.is_user_turn_pending_or_running();
                         break;

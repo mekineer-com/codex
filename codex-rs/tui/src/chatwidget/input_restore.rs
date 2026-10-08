@@ -605,6 +605,7 @@ impl ChatWidget {
             composer: composer.has_content().then_some(composer),
             safety_buffering_prompt: self.safety_buffering_prompt.clone(),
             safety_buffering_source: self.safety_buffering_source,
+            safety_buffering_order: self.safety_buffering_order,
             pending_steers: self.input_queue.pending_steers.clone(),
             rejected_steers_queue: self.input_queue.rejected_steers_queue.clone(),
             rejected_steer_sources: self.input_queue.rejected_steer_sources.clone(),
@@ -646,6 +647,7 @@ impl ChatWidget {
             self.config.plan_mode_reasoning_effort = input_state.plan_mode_reasoning_effort;
             self.safety_buffering_prompt = input_state.safety_buffering_prompt;
             self.safety_buffering_source = input_state.safety_buffering_source;
+            self.safety_buffering_order = input_state.safety_buffering_order;
             self.turn_lifecycle.restore_running(
                 preserve_in_flight_turn && input_state.agent_turn_running,
                 Instant::now(),
@@ -709,6 +711,7 @@ impl ChatWidget {
                 .restore_running(/*running*/ false, Instant::now());
             self.safety_buffering_prompt = None;
             self.safety_buffering_source = UserMessageSource::Prompt;
+            self.safety_buffering_order = 0;
             self.input_queue.clear();
             self.restore_composer_state(Default::default());
         }

@@ -1817,6 +1817,7 @@ async fn restore_thread_input_state_applies_running_state_policy() {
         }),
         safety_buffering_prompt: Some(UserMessage::from("buffered prompt")),
         safety_buffering_source: UserMessageSource::Prompt,
+        safety_buffering_order: 0,
         pending_steers: VecDeque::from([PendingSteer {
             recall_order: 0,
             history_record: pending_history.clone(),
@@ -2117,7 +2118,12 @@ async fn recall_refuses_unconfirmed_input_after_reconnect() {
 
 #[tokio::test]
 async fn queued_image_preparation_preserves_submission_order() {
-    for action in [QueuedInputAction::Plain, QueuedInputAction::Literal] {
+    for action in [
+        QueuedInputAction::Plain,
+        QueuedInputAction::Literal,
+        QueuedInputAction::ParseSlash,
+        QueuedInputAction::RunShell,
+    ] {
         let (mut chat, _rx, _ops) = make_chatwidget_manual(None).await;
         chat.thread_id = Some(ThreadId::new());
         chat.snapshot_local_images = true;
@@ -2130,7 +2136,7 @@ async fn queued_image_preparation_preserves_submission_order() {
                     placeholder: "[Image #1]".into(),
                     path,
                 }],
-                ..UserMessage::from("older image prompt")
+                ..UserMessage::from("/tmp/older image prompt")
             },
             action,
         );
@@ -2153,6 +2159,32 @@ async fn queued_image_preparation_preserves_submission_order() {
         assert_eq!(chat.bottom_pane.composer_text(), "newer text prompt");
         assert!(chat.pending_image_submission.is_some());
     }
+}
+
+#[tokio::test]
+async fn reserve_recovery_preserves_the_initial_submission_order() {
+    let (mut chat, _rx, _ops) = make_chatwidget_manual(Some("gpt-5")).await;
+    chat.thread_id = Some(ThreadId::new());
+    let older = QueuedUserMessage::from(UserMessage::from("older held draft"));
+    let older_order = older.recall_order;
+    chat.input_queue.queued_user_messages.push_back(older);
+    chat.input_queue.recovered_queue = true;
+    chat.submit_user_message(UserMessage::from("newer initial prompt"));
+    assert!(chat.safety_buffering_order > older_order);
+    chat.backend_banner_state.banner = Some(
+        serde_json::from_value(serde_json::json!({
+            "banner_type": "luna_reserve", "title": "Reserve", "description": "", "ctas": []
+        }))
+        .unwrap(),
+    );
+    assert!(chat.defer_pending_turn_for_luna_reserve());
+    assert_eq!(
+        chat.pop_latest_queued_composer_state()
+            .expect("recalled input")
+            .text,
+        "newer initial prompt"
+    );
+    assert_eq!(chat.queued_user_message_texts(), vec!["older held draft"]);
 }
 
 #[tokio::test]

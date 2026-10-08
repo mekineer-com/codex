@@ -691,6 +691,7 @@ pub(crate) struct ChatWidget {
     input_queue: InputQueueState,
     safety_buffering_prompt: Option<UserMessage>,
     safety_buffering_source: UserMessageSource,
+    safety_buffering_order: u64,
     /// Main chat-surface bindings resolved from `tui.keymap.chat`.
     chat_keymap: ChatKeymap,
     permission_shortcut_pending: bool,

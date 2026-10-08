@@ -24,6 +24,7 @@ enum SlashCommandDispatchSource {
 }
 
 struct PreparedSlashCommandArgs {
+    recall_order: Option<u64>,
     args: String,
     text_elements: Vec<TextElement>,
     pending_pastes: Vec<(String, String)>,
@@ -700,6 +701,7 @@ impl ChatWidget {
             self.dispatch_prepared_command_with_args(
                 cmd,
                 PreparedSlashCommandArgs {
+                    recall_order: None,
                     args,
                     text_elements,
                     pending_pastes: self.bottom_pane.composer_pending_pastes(),
@@ -720,6 +722,7 @@ impl ChatWidget {
         self.dispatch_prepared_command_with_args(
             cmd,
             PreparedSlashCommandArgs {
+                recall_order: None,
                 args: prepared_args,
                 text_elements: prepared_elements,
                 pending_pastes: Vec::new(),
@@ -788,6 +791,7 @@ impl ChatWidget {
             self.transcript.last_status_copy_targets = None;
         }
         let PreparedSlashCommandArgs {
+            recall_order,
             args,
             text_elements,
             pending_pastes,
@@ -947,9 +951,13 @@ impl ChatWidget {
                     self.reasoning_header = None;
                     self.reasoning_summary_parts.clear();
                     self.set_status_header(String::from("Working"));
-                    self.submit_user_message_with_shell_escape_policy(
+                    self.submit_user_message_with_prepared_images(
                         user_message,
+                        UserMessageHistoryRecord::UserMessageText,
                         ShellEscapePolicy::Disallow,
+                        UserMessageSource::Prompt,
+                        None,
+                        recall_order,
                     );
                 } else {
                     self.queue_user_message_with_options(
@@ -1117,6 +1125,7 @@ impl ChatWidget {
         let QueuedUserMessage {
             user_message,
             pending_pastes,
+            recall_order,
             ..
         } = queued_message;
         let UserMessage {
@@ -1127,24 +1136,30 @@ impl ChatWidget {
             mention_bindings,
         } = user_message;
         let Some((name, rest, rest_offset)) = parse_slash_name(&text) else {
-            self.submit_user_message(UserMessage {
-                text,
-                local_images,
-                remote_image_urls,
-                text_elements,
-                mention_bindings,
-            });
+            self.submit_user_message_with_order(
+                UserMessage {
+                    text,
+                    local_images,
+                    remote_image_urls,
+                    text_elements,
+                    mention_bindings,
+                },
+                recall_order,
+            );
             return QueueDrain::Stop;
         };
 
         if name.contains('/') {
-            self.submit_user_message(UserMessage {
-                text,
-                local_images,
-                remote_image_urls,
-                text_elements,
-                mention_bindings,
-            });
+            self.submit_user_message_with_order(
+                UserMessage {
+                    text,
+                    local_images,
+                    remote_image_urls,
+                    text_elements,
+                    mention_bindings,
+                },
+                recall_order,
+            );
             return QueueDrain::Stop;
         }
 
@@ -1175,23 +1190,29 @@ impl ChatWidget {
         }
 
         if !command.supports_inline_args() {
-            self.submit_user_message(UserMessage {
-                text,
-                local_images,
-                remote_image_urls,
-                text_elements,
-                mention_bindings,
-            });
+            self.submit_user_message_with_order(
+                UserMessage {
+                    text,
+                    local_images,
+                    remote_image_urls,
+                    text_elements,
+                    mention_bindings,
+                },
+                recall_order,
+            );
             return QueueDrain::Stop;
         }
         let SlashCommandItem::Builtin(cmd) = command else {
-            self.submit_user_message(UserMessage {
-                text,
-                local_images,
-                remote_image_urls,
-                text_elements,
-                mention_bindings,
-            });
+            self.submit_user_message_with_order(
+                UserMessage {
+                    text,
+                    local_images,
+                    remote_image_urls,
+                    text_elements,
+                    mention_bindings,
+                },
+                recall_order,
+            );
             return QueueDrain::Stop;
         };
 
@@ -1213,6 +1234,7 @@ impl ChatWidget {
                 remote_image_urls,
                 mention_bindings,
                 source: SlashCommandDispatchSource::Queued,
+                recall_order: Some(recall_order),
             },
         );
         self.queued_command_drain_result(cmd)

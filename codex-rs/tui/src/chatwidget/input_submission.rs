@@ -62,14 +62,18 @@ impl ChatWidget {
         drain
     }
 
-    pub(super) fn submit_queued_shell_prompt(&mut self, user_message: UserMessage) -> QueueDrain {
+    pub(super) fn submit_queued_shell_prompt(
+        &mut self,
+        user_message: UserMessage,
+        recall_order: u64,
+    ) -> QueueDrain {
         match user_message.text.strip_prefix('!') {
             Some(command) => {
                 let history_text = user_message.text.clone();
                 self.submit_shell_command_with_history(command, &history_text)
             }
             None => {
-                self.submit_user_message(user_message);
+                self.submit_user_message_with_order(user_message, recall_order);
                 QueueDrain::Stop
             }
         }
@@ -79,6 +83,21 @@ impl ChatWidget {
         let _accepted = self.submit_user_message_with_history_record(
             user_message,
             UserMessageHistoryRecord::UserMessageText,
+        );
+    }
+
+    pub(super) fn submit_user_message_with_order(
+        &mut self,
+        user_message: UserMessage,
+        recall_order: u64,
+    ) {
+        self.submit_user_message_with_prepared_images(
+            user_message,
+            UserMessageHistoryRecord::UserMessageText,
+            ShellEscapePolicy::Allow,
+            UserMessageSource::Prompt,
+            None,
+            Some(recall_order),
         );
     }
 
@@ -546,6 +565,7 @@ impl ChatWidget {
         if render_in_history {
             self.safety_buffering_prompt = Some(submitted_message.clone());
             self.safety_buffering_source = source;
+            self.safety_buffering_order = recall_order;
             if !render_before_submit {
                 self.on_user_message_display(user_message_display_for_history(
                     submitted_message,

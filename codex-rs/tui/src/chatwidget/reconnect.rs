@@ -59,7 +59,7 @@ impl ChatWidget {
                 && let Some(prompt) = input.safety_buffering_prompt.take()
             {
                 input.queued_user_messages.push_front(QueuedUserMessage {
-                    recall_order: 0,
+                    recall_order: input.safety_buffering_order,
                     source: input.safety_buffering_source,
                     delivery: if input.reconnect_pending {
                         MessageDelivery::Unconfirmed(input.pending_user_message_client_id.take())
@@ -142,7 +142,7 @@ impl ChatWidget {
             self.input_queue
                 .queued_user_messages
                 .push_front(QueuedUserMessage {
-                    recall_order: 0,
+                    recall_order: self.safety_buffering_order,
                     source: self.safety_buffering_source,
                     delivery: MessageDelivery::Unconfirmed(
                         self.input_queue.pending_user_message_client_id.clone(),

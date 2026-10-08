@@ -149,6 +149,7 @@ pub(crate) struct ThreadInputState {
     pub(super) composer: Option<ThreadComposerState>,
     pub(super) safety_buffering_prompt: Option<UserMessage>,
     pub(super) safety_buffering_source: UserMessageSource,
+    pub(super) safety_buffering_order: u64,
     pub(crate) pending_steers: VecDeque<PendingSteer>,
     pub(super) rejected_steers_queue: VecDeque<UserMessage>,
     pub(super) rejected_steer_sources: VecDeque<UserMessageSource>,
