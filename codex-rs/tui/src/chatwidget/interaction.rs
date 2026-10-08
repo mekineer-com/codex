@@ -185,7 +185,7 @@ impl ChatWidget {
             } else {
                 use super::recall_order::RecallTarget;
                 match self.input_queue.newest_recall_target(
-                    true,
+                    |pending| pending.source == UserMessageSource::Prompt,
                     self.pending_image_submission
                         .as_ref()
                         .map(|pending| pending.recall_order),

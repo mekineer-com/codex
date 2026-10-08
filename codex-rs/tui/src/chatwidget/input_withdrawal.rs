@@ -68,6 +68,7 @@ impl ChatWidget {
             .pending_steers
             .remove(index)
             .expect("located pending input");
+        self.input_queue.refresh_recovered_queue();
         self.restore_user_message_to_composer(user_message_for_restore(
             pending.user_message,
             &pending.history_record,

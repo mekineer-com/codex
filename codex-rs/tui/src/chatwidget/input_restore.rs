@@ -259,11 +259,10 @@ impl ChatWidget {
 
     pub(super) fn pop_latest_queued_composer_state(&mut self) -> Option<ThreadComposerState> {
         use super::recall_order::RecallTarget;
-        let target = self.input_queue.newest_recall_target(false, None)?;
+        let target = self.input_queue.newest_recall_target(|_| false, None)?;
         if let RecallTarget::Queued(index) = target {
             let user_message = self.input_queue.queued_user_messages.remove(index)?;
-            self.input_queue.recovered_queue &= self.input_queue.has_queued_follow_up_messages()
-                || !self.input_queue.pending_steers.is_empty();
+            self.input_queue.refresh_recovered_queue();
             let history_record = self
                 .input_queue
                 .queued_user_message_history_records
@@ -285,8 +284,7 @@ impl ChatWidget {
             let user_message = self.input_queue.rejected_steers_queue.remove(index)?;
             self.input_queue.rejected_steer_sources.remove(index);
             self.input_queue.rejected_steer_orders.remove(index);
-            self.input_queue.recovered_queue &= self.input_queue.has_queued_follow_up_messages()
-                || !self.input_queue.pending_steers.is_empty();
+            self.input_queue.refresh_recovered_queue();
             let history_record = self
                 .input_queue
                 .rejected_steer_history_records
@@ -715,8 +713,7 @@ impl ChatWidget {
             self.input_queue.clear();
             self.restore_composer_state(Default::default());
         }
-        self.input_queue.recovered_queue &= self.input_queue.has_queued_follow_up_messages()
-            || !self.input_queue.pending_steers.is_empty();
+        self.input_queue.refresh_recovered_queue();
         let effort = self.effective_reasoning_effort();
         self.bottom_pane
             .set_active_reasoning_effort_baseline(effort.as_ref());

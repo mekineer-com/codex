@@ -60,7 +60,7 @@ pub(super) struct InputQueueState {
 impl InputQueueState {
     pub(super) fn newest_recall_target(
         &self,
-        include_pending: bool,
+        pending_is_recallable: impl Fn(&PendingSteer) -> bool,
         image_order: Option<u64>,
     ) -> Option<super::recall_order::RecallTarget> {
         use super::recall_order::RecallTarget;
@@ -83,7 +83,7 @@ impl InputQueueState {
             .pending_steers
             .iter()
             .enumerate()
-            .filter(|(_, message)| include_pending && message.source == UserMessageSource::Prompt)
+            .filter(|(_, message)| pending_is_recallable(message))
             .map(|(index, message)| (RecallTarget::Pending(index), message.recall_order));
         queued
             .chain(rejected)
@@ -105,6 +105,11 @@ impl InputQueueState {
 
     pub(super) fn has_queued_follow_up_messages(&self) -> bool {
         !self.rejected_steers_queue.is_empty() || !self.queued_user_messages.is_empty()
+    }
+
+    pub(super) fn refresh_recovered_queue(&mut self) {
+        self.recovered_queue &=
+            self.has_queued_follow_up_messages() || !self.pending_steers.is_empty();
     }
 
     pub(super) fn clear(&mut self) {

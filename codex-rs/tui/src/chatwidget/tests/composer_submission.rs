@@ -2041,6 +2041,7 @@ async fn recall_uses_submission_order_across_local_and_server_queues() {
             .queued_user_messages
             .push_back(queued.clone());
         chat.input_queue.pending_steers.push_back(pending.clone());
+        chat.input_queue.recovered_queue = true;
         let saved = chat.capture_thread_input_state().expect("input snapshot");
         chat.restore_thread_input_state(
             Some(saved),
@@ -2073,10 +2074,14 @@ async fn recall_uses_submission_order_across_local_and_server_queues() {
             );
             chat.on_pending_steer_withdrawn(&pending.client_id);
             assert_eq!(chat.bottom_pane.composer_text(), "sent follow-up");
+            assert!(chat.input_queue.recovered_queue);
         } else {
             assert!(op_rx.try_recv().is_err());
             assert_eq!(chat.bottom_pane.composer_text(), "local draft");
-            assert_eq!(chat.input_queue.pending_steers, VecDeque::from([pending]));
+            assert_eq!(
+                chat.input_queue.pending_steers,
+                VecDeque::from([pending.clone()])
+            );
         }
         chat.bottom_pane
             .set_composer_text(String::new(), Vec::new(), Vec::new());
@@ -2086,8 +2091,39 @@ async fn recall_uses_submission_order_across_local_and_server_queues() {
             assert_eq!(chat.bottom_pane.composer_text(), "local draft");
         } else {
             assert!(matches!(op_rx.try_recv(), Ok(Op::WithdrawSteer { .. })));
+            chat.on_pending_steer_withdrawn(&pending.client_id);
         }
+        assert!(!chat.input_queue.recovered_queue);
     }
+}
+
+#[tokio::test]
+async fn disconnected_recall_preserves_upstream_answer_recovery_and_held_drafts() {
+    let (mut chat, _rx, mut ops) = make_chatwidget_manual(None).await;
+    while ops.try_recv().is_ok() {}
+    chat.input_queue
+        .queued_user_messages
+        .push_back(UserMessage::from("older held draft").into());
+    let mut pending = pending_steer("newer question reply");
+    pending.source = UserMessageSource::QuestionAnswer;
+    chat.input_queue.pending_steers.push_back(pending);
+    chat.input_queue.recovered_queue = true;
+    chat.handle_restricted_key(
+        KeyEvent::new(KeyCode::Up, KeyModifiers::ALT),
+        RestrictedInputMode::Disconnected,
+    );
+    assert_eq!(chat.bottom_pane.composer_text(), "newer question reply");
+    assert!(chat.input_queue.pending_steers.is_empty());
+    assert!(chat.input_queue.recovered_queue);
+    chat.bottom_pane
+        .set_composer_text(String::new(), Vec::new(), Vec::new());
+    chat.handle_restricted_key(
+        KeyEvent::new(KeyCode::Up, KeyModifiers::ALT),
+        RestrictedInputMode::Disconnected,
+    );
+    assert_eq!(chat.bottom_pane.composer_text(), "older held draft");
+    assert!(!chat.input_queue.recovered_queue);
+    assert!(ops.try_recv().is_err());
 }
 
 #[tokio::test]
