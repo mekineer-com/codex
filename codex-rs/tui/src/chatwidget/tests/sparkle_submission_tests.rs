@@ -54,7 +54,7 @@ async fn ordinary_and_prepared_image_submissions_consume_the_sparkle_before_rend
                 ShellEscapePolicy::Disallow,
                 UserMessageSource::Prompt,
                 Some(images),
-                None,
+                super::super::recall_order::next_input_order(),
             ),
             None => chat.submit_user_message_with_history_and_shell_escape_policy(
                 message,

@@ -16,8 +16,8 @@ use crate::wrapping::adaptive_wrap_lines;
 /// resubmitted at end of turn, then ordinary queued user messages. Pending
 /// steers explain that they will be submitted after the next tool/result
 /// boundary unless the user invokes the interrupt binding to send them
-/// immediately. The edit hint at the bottom only appears when there are actual
-/// queued user inputs to pop back into the composer. The displayed binding is
+/// immediately. The recall hint covers all pending-message sections.
+/// The displayed binding is
 /// configurable via [`set_edit_binding`](Self::set_edit_binding).
 pub(crate) struct PendingInputPreview {
     pub pending_steers: Vec<String>,
@@ -163,13 +163,15 @@ impl PendingInputPreview {
             }
         }
 
-        if !self.queued_messages.is_empty()
+        if (!self.queued_messages.is_empty()
+            || !self.pending_steers.is_empty()
+            || !self.rejected_steers.is_empty())
             && !has_questions
             && let Some(edit_binding) = self.edit_binding
         {
             let mut hint = Line::from("    ");
             hint.spans.extend(edit_binding.spans());
-            hint.spans.push(" edit last queued message".dim());
+            hint.spans.push(" recall newest message".dim());
             lines.push(hint);
         }
 

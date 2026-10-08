@@ -97,7 +97,7 @@ impl ChatWidget {
             ShellEscapePolicy::Allow,
             UserMessageSource::Prompt,
             None,
-            Some(recall_order),
+            recall_order,
         );
     }
 
@@ -142,7 +142,7 @@ impl ChatWidget {
             shell_escape_policy,
             source,
             /*prepared_images*/ None,
-            /*recall_order*/ None,
+            super::recall_order::next_input_order(),
         )
     }
 
@@ -153,9 +153,8 @@ impl ChatWidget {
         shell_escape_policy: ShellEscapePolicy,
         source: UserMessageSource,
         prepared_images: Option<Vec<UserInput>>,
-        recall_order: Option<u64>,
+        recall_order: u64,
     ) -> (bool, Option<AppCommand>) {
-        let recall_order = recall_order.unwrap_or_else(super::recall_order::next_input_order);
         self.bottom_pane.dismiss_composer_sparkle();
         if self.has_misalignment_policy_violation() {
             return (false, None);

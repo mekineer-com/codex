@@ -394,25 +394,35 @@ impl ChatWidget {
                 }
                 if let Some((message, history_record)) = self.pop_next_queued_user_message() {
                     let source = message.source;
-                    self.submit_user_message_with_history_and_shell_escape_policy(
+                    let recall_order = message.recall_order;
+                    self.submit_user_message_with_prepared_images(
                         message.into_user_message(),
                         history_record,
                         ShellEscapePolicy::Allow,
                         source,
+                        None,
+                        recall_order,
                     );
                 }
             } else if !pending_steers.is_empty() {
+                let recall_order = pending_steers
+                    .iter()
+                    .map(|pending| pending.recall_order)
+                    .max()
+                    .unwrap_or(0);
                 let (user_message, history_record) = merge_user_messages_with_history_record(
                     pending_steers
                         .into_iter()
                         .map(|pending| (pending.user_message, pending.history_record))
                         .collect(),
                 );
-                self.submit_user_message_with_history_and_shell_escape_policy(
+                self.submit_user_message_with_prepared_images(
                     user_message,
                     history_record,
                     ShellEscapePolicy::Allow,
                     UserMessageSource::Prompt,
+                    None,
+                    recall_order,
                 );
             } else if let Some(combined) = self.drain_pending_messages_for_restore() {
                 self.restore_composer_state(combined);

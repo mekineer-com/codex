@@ -80,7 +80,7 @@ impl ChatWidget {
                     ShellEscapePolicy::Disallow,
                     pending.source,
                     Some(images),
-                    Some(pending.recall_order),
+                    pending.recall_order,
                 );
                 if !accepted {
                     self.input_queue.recovered_queue |=

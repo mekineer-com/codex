@@ -267,7 +267,7 @@ impl ChatWidget {
                             ShellEscapePolicy::Allow,
                             source,
                             None,
-                            Some(recall_order),
+                            recall_order,
                         )
                         .0;
                     break;
@@ -310,7 +310,7 @@ impl ChatWidget {
                             ShellEscapePolicy::Disallow,
                             source,
                             None,
-                            Some(recall_order),
+                            recall_order,
                         )
                         .0;
                     if !submitted_follow_up {

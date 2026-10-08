@@ -24,7 +24,7 @@ enum SlashCommandDispatchSource {
 }
 
 struct PreparedSlashCommandArgs {
-    recall_order: Option<u64>,
+    recall_order: u64,
     args: String,
     text_elements: Vec<TextElement>,
     pending_pastes: Vec<(String, String)>,
@@ -701,7 +701,7 @@ impl ChatWidget {
             self.dispatch_prepared_command_with_args(
                 cmd,
                 PreparedSlashCommandArgs {
-                    recall_order: None,
+                    recall_order: super::recall_order::next_input_order(),
                     args,
                     text_elements,
                     pending_pastes: self.bottom_pane.composer_pending_pastes(),
@@ -722,7 +722,7 @@ impl ChatWidget {
         self.dispatch_prepared_command_with_args(
             cmd,
             PreparedSlashCommandArgs {
-                recall_order: None,
+                recall_order: super::recall_order::next_input_order(),
                 args: prepared_args,
                 text_elements: prepared_elements,
                 pending_pastes: Vec::new(),
@@ -1234,7 +1234,7 @@ impl ChatWidget {
                 remote_image_urls,
                 mention_bindings,
                 source: SlashCommandDispatchSource::Queued,
-                recall_order: Some(recall_order),
+                recall_order,
             },
         );
         self.queued_command_drain_result(cmd)
