@@ -1,3 +1,26 @@
+# Codex CLI: Waiting-Message Recall
+
+This fork lets you take back a message that is still waiting while Codex works,
+without interrupting it. Press **Alt+Up** to return the newest waiting message
+to the input field, whether it was queued with Tab or sent with Enter. Edit it,
+send it again, or discard it.
+
+- Clear the input field before recalling another message; existing drafts and
+  attachments are not overwritten.
+- A sent message returns only after Codex confirms it was removed from the
+  waiting queue. Messages already being processed cannot be taken back.
+- Ordinary Up still navigates previously sent messages. Disconnected recovery
+  retains upstream behavior, including its uncertain-delivery notice.
+
+**Status:** built as version 0.159.3; repeated recall confirmed in a running
+NTerminal session on Alpine Linux. This is an experimental fork, not an official
+OpenAI release. The full updated automated suite has not been run.
+
+[Build from source](./docs/install.md). The upstream installers below do **not**
+include this change; this fork has no published prebuilt release.
+
+## Upstream Codex README
+
 <p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer.
 <p align="center">
   <img src="https://github.com/openai/codex/blob/main/.github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />
