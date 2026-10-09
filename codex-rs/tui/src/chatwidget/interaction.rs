@@ -173,28 +173,24 @@ impl ChatWidget {
 
         if key_event.kind == KeyEventKind::Press
             && self.chat_keymap.edit_queued_message.is_pressed(key_event)
-            && (self.has_queued_follow_up_messages()
-                || self.pending_image_submission.is_some()
-                || !self.input_queue.pending_steers.is_empty())
             && self.bottom_pane.no_modal_or_popup_active()
+            && let Some(recall_target) = self.input_queue.newest_recall_target(
+                |pending| pending.source == UserMessageSource::Prompt,
+                self.pending_image_submission.as_ref().map(|pending| pending.recall_order),
+            )
         {
             if !self.composer_is_empty_for_recall() {
                 self.add_warning_message(
-                    "Clear the input field before recalling a queued message.".to_string(),
+                    "Clear the input field before recalling a waiting message.".to_string(),
                 );
             } else {
                 use super::recall_order::RecallTarget;
-                match self.input_queue.newest_recall_target(
-                    |pending| pending.source == UserMessageSource::Prompt,
-                    self.pending_image_submission
-                        .as_ref()
-                        .map(|pending| pending.recall_order),
-                ) {
-                    Some(RecallTarget::PreparingImages) => {
+                match recall_target {
+                    RecallTarget::PreparingImages => {
                         self.cancel_image_submission();
                     }
-                    Some(RecallTarget::Pending(_)) => self.request_pending_steer_recall(),
-                    Some(RecallTarget::Queued(_) | RecallTarget::Rejected(_)) => {
+                    RecallTarget::Pending(_) => self.request_pending_steer_recall(),
+                    RecallTarget::Queued(_) | RecallTarget::Rejected(_) => {
                         if let Some(composer) = self.pop_latest_queued_composer_state() {
                             self.restore_composer_state(composer);
                             self.refresh_startup_recovery();
@@ -202,7 +198,6 @@ impl ChatWidget {
                             self.request_redraw();
                         }
                     }
-                    None => {}
                 }
             }
             return KeyEventAction::None;
