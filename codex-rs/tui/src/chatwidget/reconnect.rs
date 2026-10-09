@@ -171,13 +171,15 @@ impl ChatWidget {
         if self.handle_question_key(key) {
             return;
         }
-        if key.kind == KeyEventKind::Press && self.chat_keymap.edit_queued_message.is_pressed(key) {
+        if key.kind == KeyEventKind::Press
+            && self.chat_keymap.edit_queued_message.is_pressed(key)
+            && let Some(recall_target) = self.input_queue.newest_recall_target(|_| true, None)
+        {
             if !self.composer_is_empty_for_recall() {
                 self.add_warning_message(
                     "Clear the input field before recalling a queued message.".to_string(),
                 );
-            } else if let Some(super::recall_order::RecallTarget::Pending(index)) =
-                self.input_queue.newest_recall_target(|_| true, None)
+            } else if let super::recall_order::RecallTarget::Pending(index) = recall_target
             {
                 if let Some(steer) = self.input_queue.pending_steers.remove(index) {
                     self.restore_user_message_to_composer(user_message_for_restore(
